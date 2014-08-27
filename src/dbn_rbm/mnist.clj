@@ -24,3 +24,9 @@
         m (matrix/matrix input)
         read-data (matrix/emap read-string m)]
     (doall (mapv scale-data read-data))))
+
+(defn load-data-sans-label
+  "Load a MNIST CSV data set without the label"
+  [filepath]
+  (let [data (load-data filepath)]
+    (matrix/select data :all (range 0 784))))

@@ -7,22 +7,16 @@
             [clojure.test.check.properties :as prop]))
 
 (defn avg-bernoulli
-  "Run n iterations of a specific Bernoulli trial vector, and
+  "Run n iterations of a specific Bernoulli trial, and
   return the average value."
   [n p]
   (loop [i 0
-         running (vec (take (count p) (repeat 0)))]
+         running 0]
     (if (< i n)
-      (recur
-       (inc i)
-       (mapv + running (bernoulli p)))
-      (mapv #(/ % (double n)) running))))
+      (recur (inc i) (+ running (bernoulli p)))
+      (/ running (double n)))))
 
-(defspec bernoulli-distribution 100
-  (prop/for-all [v (gen/such-that 
-                    not-empty 
-                    (gen/vector 
-                     (gen/fmap #(double (/ % Long/MAX_VALUE)) gen/s-pos-int)))]
-                (let [a (avg-bernoulli 10000 v)
-                      close (map #(< (Math/abs (- % %2)) 0.001) v a)]
-                  (every? true? close))))
+(defspec bernoulli-distribution 10000
+  (prop/for-all [p (gen/fmap #(double (/ % Long/MAX_VALUE)) gen/s-pos-int)]
+                (let [a (avg-bernoulli 10000 p)]
+                  (< (Math/abs (- a p)) 0.001))))

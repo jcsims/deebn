@@ -1,8 +1,6 @@
 (ns dbn-rbm.util)
 
 (defn bernoulli
-  "Take a vector of probabilities, and map a single Bernoulli sample
-  over each element"
-  ([] [])
-  ([p]
-     (mapv #(if (> (rand) %) 0 1) p)))
+  "Take a single Bernoulli sample, given a probability"
+  [p]
+  (if (> (rand) p) 0 1))
