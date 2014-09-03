@@ -8,7 +8,7 @@
 
 (declare sigmoid)
 
-(defrecord RBM [w vbias hbias visible hidden])
+(defrecord RBM [w vbias hbias w-vel vbias-vel hbias-vel visible hidden])
 
 ;; FIXME: This should really be Gaussian instead of uniform.
 (defn rand-vec
@@ -21,12 +21,15 @@
   [visible hidden]
   (let [w (matrix (take visible
                         (repeatedly #(rand-vec hidden 0.01))))
-        hbias (zero-vector hidden)
+        w-vel (zero-matrix visible hidden)
         ;; TODO: The visual biases should really be set to
         ;; log(p_i/ (1  - p_i)), where p_i is the proportion of
         ;; training vectors in which unit i is turned on.
-        vbias (zero-vector visible)]
-    (->RBM w vbias hbias visible hidden)))
+        vbias (zero-vector visible)
+        hbias (zero-vector hidden)
+        vbias-vel (zero-vector visible)
+        hbias-vel (zero-vector hidden)]
+    (->RBM w vbias hbias w-vel vbias-vel hbias-vel visible hidden)))
 
 (defn build-jd-rbm
   "Build a joint density RBM for testing purposes.
@@ -47,7 +50,7 @@
 
 (defn update-rbm
   "Single batch step update of RBM parameters"
-  [batch rbm learning-rate]
+  [batch rbm learning-rate momentum]
   (let [batch-size (row-count batch)
         ph (emap sigmoid (+ (:hbias rbm) (mmul batch (:w rbm))))
         h (emap bernoulli ph)
@@ -63,15 +66,21 @@
         delta-hbias (/ (reduce + (map #(- % %2)
                                       (rows h)
                                       (rows ph2)))
-                       batch-size)]
+                       batch-size)
+        squared-error (ereduce + (emap #(* % %) (- batch v)))
+        w-vel (+ (* momentum (:w-vel rbm)) (* learning-rate delta-w))
+        vbias-vel (+ (* momentum (:vbias-vel rbm)) (* learning-rate delta-vbias))
+        hbias-vel (+ (* momentum (:hbias-vel rbm)) (* learning-rate delta-hbias))]
+    (println " reconstruction error:" (/ squared-error batch-size))
     (assoc rbm
-      :w (+ (:w rbm) (mmul learning-rate delta-w))
-      :vbias (+ (:vbias rbm) (* delta-vbias learning-rate))
-      :hbias (+ (:hbias rbm) (* delta-hbias learning-rate)))))
+      :w (+ (:w rbm) w-vel)
+      :vbias (+ (:vbias rbm) vbias-vel)
+      :hbias (+ (:hbias rbm) hbias-vel)
+      :w-vel w-vel :vbias-vel vbias-vel :hbias-vel hbias-vel)))
 
 (defn train-epoch
   "Train a single epoch"
-  [rbm train-set learning-rate batch-size]
+  [rbm train-set learning-rate momentum batch-size]
   (let [columns (column-count train-set)]
     (loop [rbm rbm
            batch (array (submatrix train-set 0 batch-size 0 columns))
@@ -81,21 +90,21 @@
         (if (>= start (row-count train-set))
           rbm
           (do
-            (println "Batch:" batch-num)
-            (recur (update-rbm batch rbm learning-rate)
+            (print "Batch:" batch-num)
+            (recur (update-rbm batch rbm learning-rate momentum)
                    (array (submatrix train-set start (- end start) 0 columns))
                    (inc batch-num))))))))
 
 (defn train-rbm
   "Given a training set, train an RBM"
-  [rbm train-set learning-rate batch-size epochs]
+  [rbm train-set learning-rate momentum batch-size epochs]
   (loop [rbm rbm
          epoch 1]
     (if (> epoch epochs)
       rbm
       (do
         (println "Training epoch" epoch)
-        (recur (train-epoch rbm train-set learning-rate batch-size)
+        (recur (train-epoch rbm train-set learning-rate momentum batch-size)
                (inc epoch))))))
 
 (defn sigmoid
@@ -116,7 +125,6 @@
 ;;==============================================================================
 ;; Testing an RBM trained on a data set
 ;;==============================================================================
-
 
 (defn gen-softmax
   "Generate a softmax output. x is the class represented by the
@@ -154,7 +162,8 @@
 
 (defn test-rbm
   "Test a joint density RBM trained on a data set. Returns an error
-  percentage."
+  percentage. test-set should have the label as the last entry in each
+  observation."
   [rbm test-set num-classes]
   (let [num-observations (row-count test-set)
         predictions (doall (pmap #(get-prediction % rbm num-classes) test-set))
@@ -174,6 +183,9 @@
                  " :w " (:w rbm)
                  " :vbias " (:vbias rbm)
                  " :hbias " (:hbias rbm)
+                 " :w-vel " (:w-vel rbm)
+                 " :vbias-vel " (:vbias-vel rbm)
+                 " :hbias-vel " (:hbias-vel rbm)
                  " :visible " (:visible rbm)
                  " :hidden " (:hidden rbm)
                  " }")))
@@ -192,6 +204,9 @@
   (->RBM (matrix (:w data))
          (array (:vbias data))
          (array (:hbias data))
+         (matrix (:w-vel data))
+         (array (:vbias-vel data))
+         (array (:hbias-vel data))
          (:visible data)
          (:hidden data)))
 
