@@ -10,6 +10,7 @@
 
 (defrecord RBM [w vbias hbias visible hidden])
 
+;; FIXME: This should really be Gaussian instead of uniform.
 (defn rand-vec
   "Create a n-length vector of random real numbers in range [-range/2 range/2]"
   [n range]
@@ -161,6 +162,7 @@
         total (reduce + errors)]
     (double (/ total num-observations))))
 
+
 ;;==============================================================================
 ;; Utility functions for an RBM
 ;;==============================================================================
@@ -183,8 +185,9 @@
 
 (defn edn->RBM
   "The default map->RBM function provided by the defrecord doesn't
-  provide us with the performant implementation, so this function adds
-  a small step to ensure that."
+  provide us with the performant implementation (i.e. matrices and
+  arrays from core.matrix), so this function adds a small step to
+  ensure that."
   [data]
   (->RBM (matrix (:w data))
          (array (:vbias data))

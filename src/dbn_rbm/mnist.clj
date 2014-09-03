@@ -12,7 +12,8 @@
     (doall (csv/read-csv in-file))))
 
 (defn scale-data
-  "Scale the input parameters to [0-1]"
+  "Scale the input parameters to [0-1]. This assumes that the label is
+  the first element. After scaling, the label is the last element."
   [x]
   (conj (mapv #(/ % 255.0) (rest x)) (first x)))
 
