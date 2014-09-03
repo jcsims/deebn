@@ -66,8 +66,8 @@
                        batch-size)]
     (assoc rbm
       :w (+ (:w rbm) (mmul learning-rate delta-w))
-      :vbias (+ (:vbias rbm) delta-vbias)
-      :hbias (+ (:hbias rbm) delta-hbias))))
+      :vbias (+ (:vbias rbm) (* delta-vbias learning-rate))
+      :hbias (+ (:hbias rbm) (* delta-hbias learning-rate)))))
 
 (defn train-epoch
   "Train a single epoch"
