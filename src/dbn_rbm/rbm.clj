@@ -1,13 +1,14 @@
 (ns dbn-rbm.rbm
   (:refer-clojure :exclude [+ - * / ==])
   (:import (java.io Writer))
+  (:require [clojure.tools.reader.edn :as edn])
   (:use [clojure.core.matrix]
         [clojure.core.matrix.operators]
         [dbn-rbm.util]))
 
 (declare sigmoid)
 
-(defrecord RBM [w hbias vbias visible hidden])
+(defrecord RBM [w vbias hbias visible hidden])
 
 (defn rand-vec
   "Create a n-length vector of random real numbers in range [-range/2 range/2]"
@@ -24,7 +25,7 @@
         ;; log(p_i/ (1  - p_i)), where p_i is the proportion of
         ;; training vectors in which unit i is turned on.
         vbias (zero-vector visible)]
-    (->RBM w hbias vbias visible hidden)))
+    (->RBM w vbias hbias visible hidden)))
 
 (defn build-jd-rbm
   "Build a joint density RBM for testing purposes.
@@ -164,18 +165,34 @@
 ;; Utility functions for an RBM
 ;;==============================================================================
 
-;; TODO: This could be drastically improved to provide better
-;; information about the RBM.
+;; This is designed for EDN printing, not actually visualizing the RBM
+;; at the REPL
 (defmethod clojure.core/print-method RBM [rbm ^Writer w]
-  (.write w (str "RBM with " (:visible rbm) " visible units "))
-  (.write w (str "and " (:hidden rbm) " hidden units.\n")))
+  (.write w (str "#dbn-rbm.rbm/RBM {"
+                 " :w " (:w rbm)
+                 " :vbias " (:vbias rbm)
+                 " :hbias " (:hbias rbm)
+                 " :visible " (:visible rbm)
+                 " :hidden " (:hidden rbm)
+                 " }")))
 
 (defn save-rbm
   "Save a RBM to disk."
   [rbm filepath]
-  )
+  (spit filepath (pr-str rbm)))
+
+(defn edn->RBM
+  "The default map->RBM function provided by the defrecord doesn't
+  provide us with the performant implementation, so this function adds
+  a small step to ensure that."
+  [data]
+  (->RBM (matrix (:w data))
+         (array (:vbias data))
+         (array (:hbias data))
+         (:visible data)
+         (:hidden data)))
 
 (defn load-rbm
   "Load a RBM from disk."
   [filepath]
-  )
+  (edn/read-string {:readers {'dbn-rbm.rbm/RBM edn->RBM}} (slurp filepath)))
