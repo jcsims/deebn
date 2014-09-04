@@ -137,8 +137,8 @@
   with an appropriate softmax unit. This assumes that the label is the
   last element in an observation."
   [x num-classes]
-  (let [label (peek x)
-        obv (pop x)
+  (let [label (last x)
+        obv (butlast x)
         new-label (gen-softmax label num-classes)]
     (vec (concat new-label obv))))
 
@@ -156,7 +156,7 @@
   "For a given observation and RBM, return the predicted class."
   [x rbm num-classes]
   (let [softmax-cases (mapv #(gen-softmax % num-classes) (range num-classes))
-        trials (mapv #(vec (concat % %2)) softmax-cases (repeat (pop x)))
+        trials (mapv #(vec (concat % %2)) softmax-cases (repeat (butlast x)))
         results (mapv #(free-energy % rbm) trials)]
     (get-min-position results)))
 
@@ -167,7 +167,7 @@
   [rbm test-set num-classes]
   (let [num-observations (row-count test-set)
         predictions (doall (pmap #(get-prediction % rbm num-classes) test-set))
-        errors (doall (map #(if (== (peek %) %2) 0 1) test-set predictions))
+        errors (doall (map #(if (== (last %) %2) 0 1) test-set predictions))
         total (reduce + errors)]
     (double (/ total num-observations))))
 
@@ -202,11 +202,11 @@
   ensure that."
   [data]
   (->RBM (matrix (:w data))
-         (array (:vbias data))
-         (array (:hbias data))
+         (matrix (:vbias data))
+         (matrix (:hbias data))
          (matrix (:w-vel data))
-         (array (:vbias-vel data))
-         (array (:hbias-vel data))
+         (matrix (:vbias-vel data))
+         (matrix (:hbias-vel data))
          (:visible data)
          (:hidden data)))
 

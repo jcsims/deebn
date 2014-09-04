@@ -22,7 +22,6 @@
   [filepath]
   (->> filepath
        (load-csv)
-       (matrix/matrix)
        (matrix/emap read-string)
        (mapv scale-data)))
 
