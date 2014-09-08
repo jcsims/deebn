@@ -1,9 +1,9 @@
-(ns dbn-rbm.mnist
-  (:require [dbn-rbm.rbm :as rbm]
+(ns deebn.mnist
+  (:require [clojure.core.matrix :as matrix]
+            [clojure.core.matrix.operators]
             [clojure.data.csv :as csv]
             [clojure.java.io :as io]
-            [clojure.core.matrix :as matrix]
-            [clojure.core.matrix.operators]))
+            [deebn.rbm :as rbm]))
 
 (defn load-csv
   "Load the CSV into memory"

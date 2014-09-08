@@ -1,4 +1,4 @@
-(ns dbn-rbm.util
+(ns deebn.util
   (:use [clojure.core.matrix]))
 
 (defn bernoulli

@@ -1,10 +1,10 @@
-(ns dbn-rbm.rbm
+(ns deebn.rbm
   (:refer-clojure :exclude [+ - * / ==])
   (:import (java.io Writer))
   (:require [clojure.tools.reader.edn :as edn])
   (:use [clojure.core.matrix]
         [clojure.core.matrix.operators]
-        [dbn-rbm.util]))
+        [deebn.util]))
 
 (declare sigmoid)
 
@@ -179,7 +179,7 @@
 ;; This is designed for EDN printing, not actually visualizing the RBM
 ;; at the REPL
 (defmethod clojure.core/print-method RBM [rbm ^Writer w]
-  (.write w (str "#dbn-rbm.rbm/RBM {"
+  (.write w (str "#deebn.rbm/RBM {"
                  " :w " (:w rbm)
                  " :vbias " (:vbias rbm)
                  " :hbias " (:hbias rbm)
@@ -213,4 +213,4 @@
 (defn load-rbm
   "Load a RBM from disk."
   [filepath]
-  (edn/read-string {:readers {'dbn-rbm.rbm/RBM edn->RBM}} (slurp filepath)))
+  (edn/read-string {:readers {'deebn.rbm/RBM edn->RBM}} (slurp filepath)))
