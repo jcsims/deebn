@@ -4,6 +4,8 @@
   (:require [clojure.tools.reader.edn :as edn])
   (:use [clojure.core.matrix]
         [clojure.core.matrix.operators]
+        [clojure.core.matrix.dataset]
+        [clojure.core.matrix.select]
         [deebn.util]))
 
 (declare sigmoid)
@@ -80,38 +82,34 @@
 
 (defn train-epoch
   "Train a single epoch"
-  [rbm train-set learning-rate momentum batch-size]
-  (let [columns (column-count train-set)]
+  [rbm dataset learning-rate momentum batch-size]
+  (let [columns (column-count dataset)]
     (loop [rbm rbm
-           batch (array (submatrix train-set 0 batch-size 0 columns))
+           batch (array (submatrix dataset 0 batch-size 0 columns))
            batch-num 1]
       (let [start (* (dec batch-num) batch-size)
-            end (min (* batch-num batch-size) (row-count train-set))]
-        (if (>= start (row-count train-set))
+            end (min (* batch-num batch-size) (row-count dataset))]
+        (if (>= start (row-count dataset))
           rbm
           (do
             (print "Batch:" batch-num)
             (recur (update-rbm batch rbm learning-rate momentum)
-                   (array (submatrix train-set start (- end start) 0 columns))
+                   (array (submatrix dataset start (- end start) 0 columns))
                    (inc batch-num))))))))
 
-(defn train-rbm
-  "Given a training set, train an RBM"
-  [rbm train-set learning-rate momentum batch-size epochs]
-  (loop [rbm rbm
-         epoch 1]
-    (if (> epoch epochs)
-      rbm
-      (do
-        (println "Training epoch" epoch)
-        (recur (train-epoch rbm train-set learning-rate momentum batch-size)
-               (inc epoch))))))
-
-(defn sigmoid
-  "Sigmoid function, used as an activation function for nodes in a
-  network."
-  [^double x]
-  (/ (+ 1 (Math/exp (* -1 x)))))
+(defn select-overfitting-sets
+  "Given a dataset, attempt to choose reasonable validation and test
+  sets to monitor overfitting."
+  [dataset]
+  (let [obvs (row-count dataset)
+        validation-indices (set (repeatedly (/ obvs 100) #(rand-int obvs)))
+        validations (select-rows dataset validation-indices)
+        train-indices (clojure.set/difference
+                      (set (repeatedly (/ obvs 100) #(rand-int obvs)))
+                      validation-indices)
+        train-sample (select-rows dataset train-indices)]
+    {:validations validations
+     :train-sample train-sample}))
 
 (defn free-energy
   "Compute the free energy of a given visible vector and RBM. Lower is
@@ -120,6 +118,51 @@
   (let [hidden-input (+ (:hbias rbm) (mmul x (:w rbm)))]
     (- (- (mmul x (:vbias rbm)))
        (reduce + (mapv #(Math/log (+ 1 (Math/exp %))) hidden-input)))))
+
+(defn check-overfitting
+  "Given an rbm, a sample from the training set, and a validation set,
+  determine if the model is starting to overfit the data. This is
+  measured by a difference in the average free energy over the
+  training set sample and the validation set."
+  [rbm train-sample validations]
+  (let [avg-train-energy (mean (pmap #(free-energy %1 rbm) (rows train-sample)))
+        avg-validation-energy (mean (pmap #(free-energy %1 rbm)
+                                          (rows validations)))]
+    (println "Avg training free energy:" avg-train-energy
+             "Avg validation free energy:" avg-validation-energy
+             "Gap:" (abs (- avg-train-energy avg-validation-energy)))))
+
+(defn train-rbm
+  "Given a training set, train an RBM
+
+  overfitting-sets is a map with the following two entries:
+  validations is a vector of observations held out from training, to
+  be used to monitor overfitting.
+
+  train-sample is a vector of test observations that are used to
+  monitor overfitting. These observations are used during training,
+  and their free energy is compared to that of the validation set."
+  [rbm dataset learning-rate momentum batch-size epochs
+   & {:keys [overfitting-sets]
+      :or {overfitting-sets (select-overfitting-sets dataset)}}]
+  (let [validations (:validations overfitting-sets)
+        train-sample (:train-sample overfitting-sets)]
+    (loop [rbm rbm
+           epoch 1]
+      (if (> epoch epochs)
+        rbm
+        (do
+          (if (== (rem epoch 2) 0)
+            (check-overfitting rbm train-sample validations))
+          (println "Training epoch" epoch)
+          (recur (train-epoch rbm dataset learning-rate momentum batch-size)
+                 (inc epoch)))))))
+
+(defn sigmoid
+  "Sigmoid function, used as an activation function for nodes in a
+  network."
+  [^double x]
+  (/ (+ 1 (Math/exp (* -1 x)))))
 
 
 ;;==============================================================================
@@ -162,12 +205,14 @@
 
 (defn test-rbm
   "Test a joint density RBM trained on a data set. Returns an error
-  percentage. test-set should have the label as the last entry in each
+  percentage.
+
+  dataset should have the label as the last entry in each
   observation."
-  [rbm test-set num-classes]
-  (let [num-observations (row-count test-set)
-        predictions (doall (pmap #(get-prediction % rbm num-classes) test-set))
-        errors (doall (map #(if (== (last %) %2) 0 1) test-set predictions))
+  [rbm dataset num-classes]
+  (let [num-observations (row-count dataset)
+        predictions (doall (pmap #(get-prediction % rbm num-classes) dataset))
+        errors (doall (map #(if (== (last %) %2) 0 1) dataset predictions))
         total (reduce + errors)]
     (double (/ total num-observations))))
 

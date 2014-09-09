@@ -1,6 +1,7 @@
 (ns deebn.mnist
   (:require [clojure.core.matrix :as matrix]
             [clojure.core.matrix.operators]
+            [clojure.core.matrix.dataset :as ds]
             [clojure.data.csv :as csv]
             [clojure.java.io :as io]
             [deebn.rbm :as rbm]))
@@ -23,17 +24,18 @@
   (->> filepath
        (load-csv)
        (matrix/emap read-string)
-       (mapv scale-data)))
+       (mapv scale-data)
+       (ds/dataset)))
 
 (defn load-data-sans-label
   "Load a MNIST CSV data set without the label"
   [filepath]
   (let [data (load-data filepath)]
-    (matrix/select data :all (range 0 784))))
+    (ds/select-columns data (range 0 784))))
 
 (defn load-data-with-softmax
   "Load a dataset with the class label expanded to a softmax-appropriate form.
   Example: In the MNIST dataset, class '7' expands to -> '0 0 0 0 0 0 0 1 0 0"
   [filepath]
   (let [data (load-data filepath)]
-    (doall (mapv #(rbm/softmax-from-obv % 10) data))))
+    (ds/dataset (mapv #(rbm/softmax-from-obv % 10) (matrix/rows data)))))
