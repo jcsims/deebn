@@ -1,15 +1,17 @@
 (ns deebn.rbm
   (:refer-clojure :exclude [+ - * / ==])
   (:import (java.io Writer))
-  (:require [clojure.tools.reader.edn :as edn])
-  (:use [clojure.core.matrix]
-        [clojure.core.matrix.operators]
-        [clojure.core.matrix.dataset]
-        [clojure.core.matrix.select]
-        [deebn.util]))
+  (:require [clojure.core.matrix.operators :refer [+ - * / ==]]
+            [clojure.set :refer [difference]]
+            [clojure.core.matrix :as m]
+            [clojure.core.matrix.select :as s]
+            [clojure.tools.reader.edn :as edn]
+            [taoensso.timbre.profiling :as prof])
+  (:use [deebn.util]))
 
-(declare sigmoid)
-
+;;;===========================================================================
+;;; Generate Restricted Boltzmann Machines
+;;; ==========================================================================
 (defrecord RBM [w vbias hbias w-vel vbias-vel hbias-vel visible hidden])
 
 ;; FIXME: This should really be Gaussian instead of uniform.
@@ -21,16 +23,16 @@
 (defn build-rbm
   "Factory function to produce an RBM record."
   [visible hidden]
-  (let [w (matrix (take visible
-                        (repeatedly #(rand-vec hidden 0.01))))
-        w-vel (zero-matrix visible hidden)
+  (let [w (m/matrix (take visible
+                          (repeatedly #(rand-vec hidden 0.01))))
+        w-vel (m/zero-matrix visible hidden)
         ;; TODO: The visual biases should really be set to
         ;; log(p_i/ (1  - p_i)), where p_i is the proportion of
         ;; training vectors in which unit i is turned on.
-        vbias (zero-vector visible)
-        hbias (zero-vector hidden)
-        vbias-vel (zero-vector visible)
-        hbias-vel (zero-vector hidden)]
+        vbias (m/zero-vector visible)
+        hbias (m/zero-vector hidden)
+        vbias-vel (m/zero-vector visible)
+        hbias-vel (m/zero-vector hidden)]
     (->RBM w vbias hbias w-vel vbias-vel hbias-vel visible hidden)))
 
 (defn build-jd-rbm
@@ -42,34 +44,43 @@
   [visible hidden classes]
   (build-rbm (+ visible classes) hidden))
 
+
+;;;===========================================================================
+;;; Train an RBM
+;;; ==========================================================================
+(defn sigmoid
+  "Sigmoid function, used as an activation function for nodes in a
+  network."
+  [^double x]
+  (/ (+ 1 (Math/exp (* -1 x)))))
+
 (defn update-weights
   "Determine the weight gradient from this batch"
   [ph ph2 batch pv]
-  (let [updated (pmap #(- (outer-product % %2) (outer-product %3 %4))
-                      (rows batch) (rows ph)
-                      (rows pv)    (rows ph2))]
-    (reduce + updated)))
+  (reduce + (map #(- (m/outer-product %1 %2) (m/outer-product %3 %4))
+                 (m/rows batch) (m/rows ph)
+                 (m/rows pv)    (m/rows ph2))))
 
 (defn update-rbm
   "Single batch step update of RBM parameters"
   [batch rbm learning-rate momentum]
-  (let [batch-size (row-count batch)
-        ph (emap sigmoid (+ (:hbias rbm) (mmul batch (:w rbm))))
-        h (emap bernoulli ph)
-        pv (emap sigmoid (+ (:vbias rbm)
-                            (mmul h (transpose (:w rbm)))))
-        v (emap bernoulli pv)
-        ph2 (emap sigmoid (+ (:hbias rbm) (mmul v (:w rbm))))
+  (let [batch-size (m/row-count batch)
+        ph (m/emap sigmoid (+ (:hbias rbm) (m/mmul batch (:w rbm))))
+        h (m/emap bernoulli ph)
+        pv (m/emap sigmoid (+ (:vbias rbm)
+                              (m/mmul h (m/transpose (:w rbm)))))
+        v (m/emap bernoulli pv)
+        ph2 (m/emap sigmoid (+ (:hbias rbm) (m/mmul v (:w rbm))))
         delta-w (/ (update-weights ph ph2 batch pv) batch-size)
         delta-vbias (/ (reduce + (map #(- % %2)
-                                      (rows batch)
-                                      (rows pv)))
+                                      (m/rows batch)
+                                      (m/rows pv)))
                        batch-size)
         delta-hbias (/ (reduce + (map #(- % %2)
-                                      (rows h)
-                                      (rows ph2)))
+                                      (m/rows h)
+                                      (m/rows ph2)))
                        batch-size)
-        squared-error (ereduce + (emap #(* % %) (- batch v)))
+        squared-error (m/ereduce + (m/emap #(* % %) (- batch v)))
         w-vel (+ (* momentum (:w-vel rbm)) (* learning-rate delta-w))
         vbias-vel (+ (* momentum (:vbias-vel rbm)) (* learning-rate delta-vbias))
         hbias-vel (+ (* momentum (:hbias-vel rbm)) (* learning-rate delta-hbias))]
@@ -83,31 +94,29 @@
 (defn train-epoch
   "Train a single epoch"
   [rbm dataset learning-rate momentum batch-size]
-  (let [columns (column-count dataset)]
-    (loop [rbm rbm
-           batch (array (submatrix dataset 0 batch-size 0 columns))
-           batch-num 1]
-      (let [start (* (dec batch-num) batch-size)
-            end (min (* batch-num batch-size) (row-count dataset))]
-        (if (>= start (row-count dataset))
-          rbm
-          (do
-            (print "Batch:" batch-num)
-            (recur (update-rbm batch rbm learning-rate momentum)
-                   (array (submatrix dataset start (- end start) 0 columns))
-                   (inc batch-num))))))))
+  (loop [rbm rbm
+         batch (s/sel dataset (range 0 batch-size) (s/irange))
+         batch-num 1]
+    (let [start (* (dec batch-num) batch-size)
+          end (min (* batch-num batch-size) (m/row-count dataset))]
+      (if (>= start (m/row-count dataset))
+        rbm
+        (do
+          (print "Batch:" batch-num)
+          (recur (update-rbm batch rbm learning-rate momentum)
+                 (s/sel dataset (range start end) (s/irange))
+                 (inc batch-num)))))))
 
 (defn select-overfitting-sets
   "Given a dataset, attempt to choose reasonable validation and test
   sets to monitor overfitting."
   [dataset]
-  (let [obvs (row-count dataset)
+  (let [obvs (m/row-count dataset)
         validation-indices (set (repeatedly (/ obvs 100) #(rand-int obvs)))
-        validations (select-rows dataset validation-indices)
-        train-indices (clojure.set/difference
-                      (set (repeatedly (/ obvs 100) #(rand-int obvs)))
-                      validation-indices)
-        train-sample (select-rows dataset train-indices)]
+        validations (s/sel dataset (vec validation-indices) (s/irange))
+        train-indices (difference (set (repeatedly (/ obvs 100) #(rand-int obvs)))
+                                  validation-indices)
+        train-sample (s/sel dataset (vec train-indices) (s/irange))]
     {:validations validations
      :train-sample train-sample}))
 
@@ -115,8 +124,8 @@
   "Compute the free energy of a given visible vector and RBM. Lower is
   better."
   [x rbm]
-  (let [hidden-input (+ (:hbias rbm) (mmul x (:w rbm)))]
-    (- (- (mmul x (:vbias rbm)))
+  (let [hidden-input (+ (:hbias rbm) (m/mmul x (:w rbm)))]
+    (- (- (m/mmul x (:vbias rbm)))
        (reduce + (mapv #(Math/log (+ 1 (Math/exp %))) hidden-input)))))
 
 (defn check-overfitting
@@ -125,12 +134,13 @@
   measured by a difference in the average free energy over the
   training set sample and the validation set."
   [rbm train-sample validations]
-  (let [avg-train-energy (mean (pmap #(free-energy %1 rbm) (rows train-sample)))
+  (let [avg-train-energy (mean (pmap #(free-energy %1 rbm)
+                                     (m/rows train-sample)))
         avg-validation-energy (mean (pmap #(free-energy %1 rbm)
-                                          (rows validations)))]
+                                          (m/rows validations)))]
     (println "Avg training free energy:" avg-train-energy
              "Avg validation free energy:" avg-validation-energy
-             "Gap:" (abs (- avg-train-energy avg-validation-energy)))))
+             "Gap:" (Math/abs (- avg-train-energy avg-validation-energy)))))
 
 (defn train-rbm
   "Given a training set, train an RBM
@@ -158,22 +168,16 @@
           (recur (train-epoch rbm dataset learning-rate momentum batch-size)
                  (inc epoch)))))))
 
-(defn sigmoid
-  "Sigmoid function, used as an activation function for nodes in a
-  network."
-  [^double x]
-  (/ (+ 1 (Math/exp (* -1 x)))))
 
-
-;;==============================================================================
-;; Testing an RBM trained on a data set
-;;==============================================================================
+;;;===========================================================================
+;;; Testing an RBM trained on a data set
+;;;===========================================================================
 
 (defn gen-softmax
   "Generate a softmax output. x is the class represented by the
   output, with 0 represented by the first element in the vector."
   [x num-classes]
-  (mset (zero-vector num-classes) x 1))
+  (m/mset (m/zero-vector num-classes) x 1))
 
 (defn softmax-from-obv
   "Given an observation with label attached, replace the label value
@@ -210,16 +214,16 @@
   dataset should have the label as the last entry in each
   observation."
   [rbm dataset num-classes]
-  (let [num-observations (row-count dataset)
+  (let [num-observations (m/row-count dataset)
         predictions (doall (pmap #(get-prediction % rbm num-classes) dataset))
         errors (doall (map #(if (== (last %) %2) 0 1) dataset predictions))
         total (reduce + errors)]
     (double (/ total num-observations))))
 
 
-;;==============================================================================
-;; Utility functions for an RBM
-;;==============================================================================
+;;;===========================================================================
+;;; Utility functions for an RBM
+;;;===========================================================================
 
 ;; This is designed for EDN printing, not actually visualizing the RBM
 ;; at the REPL
@@ -246,12 +250,12 @@
   arrays from core.matrix), so this function adds a small step to
   ensure that."
   [data]
-  (->RBM (matrix (:w data))
-         (matrix (:vbias data))
-         (matrix (:hbias data))
-         (matrix (:w-vel data))
-         (matrix (:vbias-vel data))
-         (matrix (:hbias-vel data))
+  (->RBM (m/matrix (:w data))
+         (m/matrix (:vbias data))
+         (m/matrix (:hbias data))
+         (m/matrix (:w-vel data))
+         (m/matrix (:vbias-vel data))
+         (m/matrix (:hbias-vel data))
          (:visible data)
          (:hidden data)))
 
