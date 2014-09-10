@@ -95,7 +95,7 @@
   "Train a single epoch"
   [rbm dataset learning-rate momentum batch-size]
   (loop [rbm rbm
-         batch (s/sel dataset (range 0 batch-size) (s/irange))
+         batch (m/matrix (s/sel dataset (range 0 batch-size) (s/irange)))
          batch-num 1]
     (let [start (* (dec batch-num) batch-size)
           end (min (* batch-num batch-size) (m/row-count dataset))]
@@ -104,7 +104,7 @@
         (do
           (print "Batch:" batch-num)
           (recur (update-rbm batch rbm learning-rate momentum)
-                 (s/sel dataset (range start end) (s/irange))
+                 (m/matrix (s/sel dataset (range start end) (s/irange)))
                  (inc batch-num)))))))
 
 (defn select-overfitting-sets
@@ -113,10 +113,10 @@
   [dataset]
   (let [obvs (m/row-count dataset)
         validation-indices (set (repeatedly (/ obvs 100) #(rand-int obvs)))
-        validations (s/sel dataset (vec validation-indices) (s/irange))
+        validations (m/matrix (s/sel dataset (vec validation-indices) (s/irange)))
         train-indices (difference (set (repeatedly (/ obvs 100) #(rand-int obvs)))
                                   validation-indices)
-        train-sample (s/sel dataset (vec train-indices) (s/irange))]
+        train-sample (m/matrix (s/sel dataset (vec train-indices) (s/irange)))]
     {:validations validations
      :train-sample train-sample}))
 
