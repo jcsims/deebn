@@ -102,7 +102,7 @@
       (if (>= start (m/row-count dataset))
         rbm
         (do
-          (print "Batch:" batch-num)
+          (print "Training batch:" batch-num)
           (recur (update-rbm batch rbm learning-rate momentum)
                  (m/matrix (s/sel dataset (range start end) (s/irange)))
                  (inc batch-num)))))))
@@ -118,7 +118,9 @@
                                   validation-indices)
         train-sample (m/matrix (s/sel dataset (vec train-indices) (s/irange)))]
     {:validations validations
-     :train-sample train-sample}))
+     :train-sample train-sample
+     :dataset  (s/sel dataset (s/exclude (vec validation-indices))
+                      (s/irange))}))
 
 (defn free-energy
   "Compute the free energy of a given visible vector and RBM. Lower is
@@ -138,35 +140,26 @@
                                      (m/rows train-sample)))
         avg-validation-energy (mean (pmap #(free-energy %1 rbm)
                                           (m/rows validations)))]
-    (println "Avg training free energy:" avg-train-energy
-             "Avg validation free energy:" avg-validation-energy
-             "Gap:" (Math/abs (- avg-train-energy avg-validation-energy)))))
+    (Math/abs (- avg-train-energy avg-validation-energy))))
 
 (defn train-rbm
-  "Given a training set, train an RBM
-
-  overfitting-sets is a map with the following two entries:
-  validations is a vector of observations held out from training, to
-  be used to monitor overfitting.
-
-  train-sample is a vector of test observations that are used to
-  monitor overfitting. These observations are used during training,
-  and their free energy is compared to that of the validation set."
-  [rbm dataset learning-rate momentum batch-size epochs
-   & {:keys [overfitting-sets]
-      :or {overfitting-sets (select-overfitting-sets dataset)}}]
-  (let [validations (:validations overfitting-sets)
-        train-sample (:train-sample overfitting-sets)]
-    (loop [rbm rbm
-           epoch 1]
-      (if (> epoch epochs)
-        rbm
-        (do
-          (if (== (rem epoch 2) 0)
-            (check-overfitting rbm train-sample validations))
-          (println "Training epoch" epoch)
-          (recur (train-epoch rbm dataset learning-rate momentum batch-size)
-                 (inc epoch)))))))
+  "Given a training set, train an RBM"
+  [rbm dataset learning-rate momentum batch-size epochs]
+  (let [{:keys [ validations train-sample dataset]}
+        (select-overfitting-sets dataset)
+        rbm (train-epoch rbm dataset learning-rate momentum batch-size)]
+    (if (> epochs 1)
+      (loop [rbm rbm
+             epoch 2
+             energy-gap (check-overfitting rbm train-sample validations)]
+        (let [rbm (train-epoch rbm dataset learning-rate momentum batch-size)
+              gap-after-train (check-overfitting rbm train-sample validations)
+              _ (println "Gap pre-train:" energy-gap "After train:" gap-after-train)]
+          ;; TODO: Stopping after any increase in energy gap might be
+          ;; too strict
+          (if (or (> epoch epochs) (neg? (- energy-gap gap-after-train)))
+            rbm
+            (recur rbm (inc epoch) gap-after-train)))))))
 
 
 ;;;===========================================================================
@@ -202,9 +195,9 @@
 (defn get-prediction
   "For a given observation and RBM, return the predicted class."
   [x rbm num-classes]
-  (let [softmax-cases (mapv #(gen-softmax % num-classes) (range num-classes))
-        trials (mapv #(vec (concat % %2)) softmax-cases (repeat (butlast x)))
-        results (mapv #(free-energy % rbm) trials)]
+  (let [softmax-cases  (mapv #(gen-softmax % num-classes) (range num-classes))
+        trials  (mapv #(vec (concat % %2)) softmax-cases (repeat (butlast x)))
+        results (prof/p :results (mapv #(free-energy % rbm) trials))]
     (get-min-position results)))
 
 (defn test-rbm
