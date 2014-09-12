@@ -7,12 +7,16 @@
             [clojure.core.matrix.select :as s]
             [clojure.tools.reader.edn :as edn]
             [taoensso.timbre.profiling :as prof])
-  (:use [deebn.util]))
+  (:use [deebn.util]
+        [deebn.protocols]))
 
 ;;;===========================================================================
 ;;; Generate Restricted Boltzmann Machines
 ;;; ==========================================================================
+;; We define a purely generative RBM, trained without any class
+;; labels, and a classification RBM
 (defrecord RBM [w vbias hbias w-vel vbias-vel hbias-vel visible hidden])
+(defrecord CRBM [w vbias hbias w-vel vbias-vel hbias-vel visible hidden classes])
 
 ;; FIXME: This should really be Gaussian instead of uniform.
 (defn rand-vec
@@ -36,13 +40,15 @@
     (->RBM w vbias hbias w-vel vbias-vel hbias-vel visible hidden)))
 
 (defn build-jd-rbm
-  "Build a joint density RBM for testing purposes.
+  "Factory function to build a joint density RBM for testing purposes.
 
   This RBM has two sets of visible units - the typical set
   representing each observation in the data set, and a softmax unit
-  representing the label for each observation."
+  representing the label for each observation. These are combined, and
+  the label becaomes part of the input vector."
   [visible hidden classes]
-  (build-rbm (+ visible classes) hidden))
+  (let [rbm (build-rbm (+ visible classes) hidden)]
+    (map->CRBM (assoc rbm :classes classes))))
 
 
 ;;;===========================================================================
@@ -160,6 +166,13 @@
           (if (or (> epoch epochs) (neg? (- energy-gap gap-after-train)))
             rbm
             (recur rbm (inc epoch) gap-after-train)))))))
+(extend-protocol Trainable
+  CRBM
+  (trainm [m dataset params]
+    (train-rbm m dataset params))
+  RBM
+  (trainm [m dataset params]
+    (train-rbm m dataset params)))
 
 
 ;;;===========================================================================
