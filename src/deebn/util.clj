@@ -8,5 +8,5 @@
 
 (defn mean
   "Find the mean (average) value of a vector."
-  [^doubles x]
-  (double (/ (reduce + x) (row-count x))))
+  [x]
+  (/ (ereduce + x) (count x)))
