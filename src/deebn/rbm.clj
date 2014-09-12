@@ -175,32 +175,33 @@
               batch-size 10
               epochs 100
               gap-delay 10
-              gap-stop-delay 2}} params
-        rbm (train-epoch rbm dataset learning-rate initial-momentum batch-size)]
-    (if (> epochs 1)
-      (loop [rbm rbm
-             epoch 2
-             energy-gap (check-overfitting rbm train-sample validations)
-             gap-inc-count 0]
-        (println "Training epoch" epoch)
-        (let [curr-momentum (if (> epoch momentum-delay)
-                              momentum initial-momentum)
-              rbm (train-epoch rbm dataset learning-rate
-                               curr-momentum batch-size)
-              gap-after-train (check-overfitting rbm train-sample validations)
-              _ (println "Gap pre-train:" energy-gap
-                         "After train:" gap-after-train)]
-          (if (or (> epoch epochs)
-                  (and (> epoch gap-delay)
+              gap-stop-delay 2}} params]
+    (println "Training epoch 1")
+    (loop [rbm (train-epoch rbm dataset learning-rate
+                            initial-momentum batch-size)
+           epoch 2
+           energy-gap (check-overfitting rbm train-sample validations)
+           gap-inc-count 0]
+      (if (> epoch epochs)
+        rbm
+        (do (println "Training epoch" epoch)
+            (let [curr-momentum (if (> epoch momentum-delay)
+                                  momentum initial-momentum)
+                  rbm (train-epoch rbm dataset learning-rate
+                                   curr-momentum batch-size)
+                  gap-after-train (check-overfitting rbm train-sample validations)
+                  _ (println "Gap pre-train:" energy-gap
+                             "After train:" gap-after-train)]
+              (if (and (> epoch gap-delay)
                        (neg? (- energy-gap gap-after-train))
-                       (> gap-inc-count gap-stop-delay)))
-            rbm
-            (recur rbm
-                   (inc epoch)
-                   gap-after-train
-                   (if (neg? (- energy-gap gap-after-train))
-                     (inc gap-inc-count)
-                     0))))))))
+                       (> gap-inc-count gap-stop-delay))
+                rbm
+                (recur rbm
+                       (inc epoch)
+                       gap-after-train
+                       (if (neg? (- energy-gap gap-after-train))
+                         (inc gap-inc-count)
+                         0)))))))))
 
 (extend-protocol Trainable
   CRBM
