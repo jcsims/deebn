@@ -149,23 +149,59 @@
     (Math/abs (- avg-train-energy avg-validation-energy))))
 
 (defn train-rbm
-  "Given a training set, train an RBM"
-  [rbm dataset learning-rate momentum batch-size epochs]
-  (let [{:keys [ validations train-sample dataset]}
+  "Given a training set, train an RBM
+
+  params is a map with various options:
+  learning-rate: defaults to 0.1
+  initial-momentum: starting momentum. Defaults to 0.5
+  momentum: momentum after `momentum-delay` epochs have passed. Defaults to 0.9
+  momentum-delay: epochs after which `momentum` is used instead of 
+    `initial-momentum`. Defaults to 3
+  batch-size: size of each mini-batch. Defaults to 10
+  epochs: number of times to train the model over the entire training set.
+    Defaults to 100
+  gap-delay: number of epochs elapsed before early stopping is considered
+  gap-stop-delay: number of sequential epochs where energy gap is increasing
+    before stopping"
+  [rbm dataset params]
+  (let [{:keys [validations train-sample dataset]}
         (select-overfitting-sets dataset)
-        rbm (train-epoch rbm dataset learning-rate momentum batch-size)]
+        {:keys [learning-rate initial-momentum momentum momentum-delay
+                batch-size epochs gap-delay gap-stop-delay]
+         :or {learning-rate 0.1
+              initial-momentum 0.5
+              momentum 0.9
+              momentum-delay 3
+              batch-size 10
+              epochs 100
+              gap-delay 10
+              gap-stop-delay 2}} params
+        rbm (train-epoch rbm dataset learning-rate initial-momentum batch-size)]
     (if (> epochs 1)
       (loop [rbm rbm
              epoch 2
-             energy-gap (check-overfitting rbm train-sample validations)]
-        (let [rbm (train-epoch rbm dataset learning-rate momentum batch-size)
+             energy-gap (check-overfitting rbm train-sample validations)
+             gap-inc-count 0]
+        (println "Training epoch" epoch)
+        (let [curr-momentum (if (> epoch momentum-delay)
+                              momentum initial-momentum)
+              rbm (train-epoch rbm dataset learning-rate
+                               curr-momentum batch-size)
               gap-after-train (check-overfitting rbm train-sample validations)
-              _ (println "Gap pre-train:" energy-gap "After train:" gap-after-train)]
-          ;; TODO: Stopping after any increase in energy gap might be
-          ;; too strict
-          (if (or (> epoch epochs) (neg? (- energy-gap gap-after-train)))
+              _ (println "Gap pre-train:" energy-gap
+                         "After train:" gap-after-train)]
+          (if (or (> epoch epochs)
+                  (and (> epoch gap-delay)
+                       (neg? (- energy-gap gap-after-train))
+                       (> gap-inc-count gap-stop-delay)))
             rbm
-            (recur rbm (inc epoch) gap-after-train)))))))
+            (recur rbm
+                   (inc epoch)
+                   gap-after-train
+                   (if (neg? (- energy-gap gap-after-train))
+                     (inc gap-inc-count)
+                     0))))))))
+
 (extend-protocol Trainable
   CRBM
   (trainm [m dataset params]
