@@ -2,8 +2,8 @@
   (:require [clojure.core.matrix :as matrix]
             [clojure.core.matrix.select :as select]
             [clojure.data.csv :as csv]
-            [clojure.java.io :as io])
-  (:use [deebn.rbm :only [softmax-from-obv]]))
+            [clojure.java.io :as io]
+            [deebn.rbm :refer [softmax-from-obv]]))
 
 (defn scale-data
   "Scale the input parameters to [0-1]. This assumes that the label is
