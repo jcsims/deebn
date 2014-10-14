@@ -24,7 +24,7 @@
   "Load a MNIST CSV data set without the label"
   [filepath]
   (let [data (load-data filepath)]
-    (select/sel data (select/irange) (range 0 784))))
+    (matrix/matrix (select/sel data (select/irange) (range 0 784)))))
 
 (defn load-data-with-softmax
   "Load a dataset with the class label expanded to a softmax-appropriate form.

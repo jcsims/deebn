@@ -22,7 +22,7 @@
 (defn rand-vec
   "Create a n-length vector of random real numbers in range [-range/2 range/2]"
   [n range]
-  (take n (repeatedly #(- (rand range) (/ range 2)))))
+  (repeatedly n #(- (rand range) (/ range 2))))
 
 (defn build-rbm
   "Factory function to produce an RBM record."
@@ -67,6 +67,7 @@
                  (m/rows batch) (m/rows ph)
                  (m/rows pv)    (m/rows ph2))))
 
+;; TODO: Implement CD-K - currently CD-1 is hard-coded.
 (defn update-rbm
   "Single batch step update of RBM parameters"
   [batch rbm learning-rate momentum]
@@ -88,8 +89,10 @@
                        batch-size)
         squared-error (m/ereduce + (m/emap #(* % %) (- batch v)))
         w-vel (+ (* momentum (:w-vel rbm)) (* learning-rate delta-w))
-        vbias-vel (+ (* momentum (:vbias-vel rbm)) (* learning-rate delta-vbias))
-        hbias-vel (+ (* momentum (:hbias-vel rbm)) (* learning-rate delta-hbias))]
+        vbias-vel (+ (* momentum (:vbias-vel rbm))
+                     (* learning-rate delta-vbias))
+        hbias-vel (+ (* momentum (:hbias-vel rbm))
+                     (* learning-rate delta-hbias))]
     (println " reconstruction error:" (/ squared-error batch-size))
     (assoc rbm
       :w (+ (:w rbm) w-vel)
@@ -119,9 +122,11 @@
   [dataset]
   (let [obvs (m/row-count dataset)
         validation-indices (set (repeatedly (/ obvs 100) #(rand-int obvs)))
-        validations (m/matrix (s/sel dataset (vec validation-indices) (s/irange)))
-        train-indices (difference (set (repeatedly (/ obvs 100) #(rand-int obvs)))
-                                  validation-indices)
+        validations (m/matrix (s/sel dataset
+                                     (vec validation-indices) (s/irange)))
+        train-indices (difference
+                        (set (repeatedly (/ obvs 100)
+                                         #(rand-int obvs))) validation-indices)
         train-sample (m/matrix (s/sel dataset (vec train-indices) (s/irange)))]
     {:validations validations
      :train-sample train-sample
@@ -155,7 +160,7 @@
   learning-rate: defaults to 0.1
   initial-momentum: starting momentum. Defaults to 0.5
   momentum: momentum after `momentum-delay` epochs have passed. Defaults to 0.9
-  momentum-delay: epochs after which `momentum` is used instead of 
+  momentum-delay: epochs after which `momentum` is used instead of
     `initial-momentum`. Defaults to 3
   batch-size: size of each mini-batch. Defaults to 10
   epochs: number of times to train the model over the entire training set.
@@ -189,7 +194,8 @@
                                   momentum initial-momentum)
                   rbm (train-epoch rbm dataset learning-rate
                                    curr-momentum batch-size)
-                  gap-after-train (check-overfitting rbm train-sample validations)
+                  gap-after-train (check-overfitting rbm train-sample
+                                                     validations)
                   _ (println "Gap pre-train:" energy-gap
                              "After train:" gap-after-train)]
               (if (and (> epoch gap-delay)
@@ -205,10 +211,10 @@
 
 (extend-protocol Trainable
   CRBM
-  (trainm [m dataset params]
+  (train-model [m dataset params]
     (train-rbm m dataset params))
   RBM
-  (trainm [m dataset params]
+  (train-model [m dataset params]
     (train-rbm m dataset params)))
 
 
@@ -263,10 +269,23 @@
         total (reduce + errors)]
     (double (/ total num-observations))))
 
+(extend-protocol Testable
+  CRBM
+  (test-model [m dataset]
+    (test-rbm m dataset (:classes m))))
+
 
 ;;;===========================================================================
 ;;; Utility functions for an RBM
 ;;;===========================================================================
+
+(defn query-hidden
+  "Given an RBM and an input vector, query the RBM for the state of
+  the hidden nodes."
+  [rbm x mean-field?]
+  (let [pre-sample (m/emap sigmoid (+ (:hbias rbm) (m/mmul x (:w rbm))))]
+    (if mean-field? pre-sample
+        (map bernoulli pre-sample))))
 
 ;; This is designed for EDN printing, not actually visualizing the RBM
 ;; at the REPL

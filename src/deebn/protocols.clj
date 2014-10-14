@@ -2,12 +2,13 @@
 
 (defprotocol Trainable
   "Protocol for models that are trainable with a dataset."
-  (trainm [m dataset params]
+  (train-model [m dataset params]
     "Train a model, given a dataset and relevant
     hyper-parameters. Refer to individual training functions for
     hyper-parameter details."))
 
 (defprotocol Testable
   "Protocol for models that are testable."
-  (testm [m dataset]
-    "Test a trained model given a dataset."))
+  (test-model [m dataset]
+    "Test a trained model given a dataset. The dataset may need to be
+    in a different format from that used to train."))
