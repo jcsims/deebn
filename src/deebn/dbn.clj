@@ -1,6 +1,7 @@
 (ns deebn.dbn
   (:require [deebn.protocols :as p]
-            [deebn.rbm :refer [build-rbm build-jd-rbm query-hidden sigmoid]]
+            [deebn.rbm :refer [build-rbm build-jd-rbm
+                               query-hidden sigmoid get-prediction]]
             [clojure.core.matrix :as m]
             [clojure.core.matrix.operators :as op]
             [clojure.core.matrix.select :as s]
@@ -109,3 +110,30 @@
   CDBN
   (train-model [m dataset params]
     (train-classify-dbn m dataset params)))
+
+
+;;;===========================================================================
+;;; Testing a DBN trained on a data set
+;;;===========================================================================
+
+
+(defn test-dbn
+  "Test a classification Deep Belief Network on a given dataset.
+
+  The dataset should have the label as the last entry in each
+  observation."
+  [dbn dataset]
+  (let [columns (m/column-count dataset)
+        labels (m/matrix (mapv vector (s/sel dataset (s/irange) (s/end dataset 1))))
+        ;; Propagate the dataset up through the lower layers of the DBN
+        prop-data (reduce #(query-hidden %2 %1 true)
+                          (m/matrix (s/sel dataset
+                                           (s/irange)
+                                           (range 0 (dec columns))))
+                          (butlast (:rbms dbn)))]
+    (p/test-model (last (:rbms dbn)) (m/join-along 1 prop-data labels))))
+
+(extend-protocol p/Testable
+  CDBN
+  (test-model [m dataset]
+    (test-dbn m dataset)))
