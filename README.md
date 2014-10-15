@@ -28,7 +28,7 @@ There are a few hyper-parameters available for training:
 ## Usage
 
 The `core` namespace aims to offer examples of using the library. The
-`mnist` namespace offers examples for bring in datasets (in this case
+`mnist` namespace offers examples for bringing in datasets (in this case
 the [MNIST][mnist] dataset).
 
 ## License
