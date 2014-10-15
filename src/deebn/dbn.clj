@@ -10,6 +10,8 @@
 (defrecord DBN [rbms layers])
 (defrecord CDBN [rbms layers classes])
 
+(m/set-current-implementation :vectorz)
+
 (defn build-dbn
   "Build a Deep Belief Network composed of Restricted Boltzmann Machines.
 

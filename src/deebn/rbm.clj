@@ -10,6 +10,8 @@
   (:use [deebn.util]
         [deebn.protocols]))
 
+(m/set-current-implementation :vectorz)
+
 ;;;===========================================================================
 ;;; Generate Restricted Boltzmann Machines
 ;;; ==========================================================================

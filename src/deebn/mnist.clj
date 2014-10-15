@@ -5,6 +5,8 @@
             [clojure.java.io :as io]
             [deebn.rbm :refer [softmax-from-obv]]))
 
+(matrix/set-current-implementation :vectorz)
+
 (defn scale-data
   "Scale the input parameters to [0-1]. This assumes that the label is
   the first element. After scaling, the label is the last element."
