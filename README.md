@@ -1,7 +1,7 @@
 # deebn
 
 A Clojure library implementing a Deep Belief Network using Restricted
-Boltzmann Machines, based on [Geoffery Hinton's work](work). This
+Boltzmann Machines, based on [Geoffery Hinton's work][work]. This
 library is the result of my thesis research into deep learning methods.
 
 ## Status
@@ -29,7 +29,7 @@ There are a few hyper-parameters available for training:
 
 The `core` namespace aims to offer examples of using the library. The
 `mnist` namespace offers examples for bring in datasets (in this case
-the [MNIST](mnist) dataset).
+the [MNIST][mnist] dataset).
 
 ## License
 
@@ -38,5 +38,5 @@ Copyright © 2014 Chris Sims
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
 
-(work): http://www.cs.toronto.edu/~hinton/absps/montrealTR.pdf
-(mnist): http://yann.lecun.com/exdb/mnist/
+[work]: http://www.cs.toronto.edu/~hinton/absps/montrealTR.pdf
+[mnist]: http://yann.lecun.com/exdb/mnist/
