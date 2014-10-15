@@ -16,11 +16,12 @@
 (defn load-data
   "Load a MNIST CSV data set."
   [filepath]
-  (with-open [in-file (io/reader filepath)]
-    (->> in-file
-         (csv/read-csv)
-         (matrix/emap read-string)
-         (mapv scale-data))))
+  (let [data (with-open [in-file (io/reader filepath)]
+               (->> in-file
+                    (csv/read-csv)
+                    (matrix/emap read-string)
+                    (mapv scale-data)))]
+    (matrix/matrix data)))
 
 (defn load-data-sans-label
   "Load a MNIST CSV data set without the label"
@@ -32,5 +33,6 @@
   "Load a dataset with the class label expanded to a softmax-appropriate form.
   Example: In the MNIST dataset, class '7' expands to -> '0 0 0 0 0 0 0 1 0 0"
   [filepath]
-  (let [data (load-data filepath)]
-    (mapv #(softmax-from-obv % 10) (matrix/rows data))))
+  (let [data (load-data filepath)
+        data (mapv #(softmax-from-obv % 10) (matrix/rows data))]
+    (matrix/matrix data)))
