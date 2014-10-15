@@ -6,9 +6,9 @@
             [clojure.core.matrix :as m]
             [clojure.core.matrix.select :as s]
             [clojure.tools.reader.edn :as edn]
-            [taoensso.timbre.profiling :as prof])
-  (:use [deebn.util]
-        [deebn.protocols]))
+            [taoensso.timbre.profiling :as prof]
+            [deebn.util :refer [mean bernoulli]]
+            [deebn.protocols :refer [Testable Trainable]]))
 
 (m/set-current-implementation :vectorz)
 

@@ -1,5 +1,5 @@
 (ns deebn.util
-  (:use [clojure.core.matrix]))
+  (:require [clojure.core.matrix :refer [ereduce]]))
 
 (defn bernoulli
   "Take a single Bernoulli sample, given a probability"
