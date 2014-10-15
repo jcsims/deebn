@@ -1,14 +1,14 @@
 (ns deebn.rbm
   (:refer-clojure :exclude [+ - * / ==])
-  (:import (java.io Writer))
-  (:require [clojure.core.matrix.operators :refer [+ - * / ==]]
-            [clojure.set :refer [difference]]
-            [clojure.core.matrix :as m]
-            [clojure.core.matrix.select :as s]
-            [clojure.tools.reader.edn :as edn]
-            [taoensso.timbre.profiling :as prof]
+  (:require [deebn.protocols :refer [Testable Trainable]]
             [deebn.util :refer [mean bernoulli]]
-            [deebn.protocols :refer [Testable Trainable]]))
+            [clojure.core.matrix :as m]
+            [clojure.core.matrix.operators :refer [+ - * / ==]]
+            [clojure.core.matrix.select :as s]
+            [clojure.set :refer [difference]]
+            [clojure.tools.reader.edn :as edn]
+            [taoensso.timbre.profiling :as prof])
+  (:import java.io.Writer))
 
 (m/set-current-implementation :vectorz)
 
@@ -127,8 +127,8 @@
         validations (m/matrix (s/sel dataset
                                      (vec validation-indices) (s/irange)))
         train-indices (difference
-                        (set (repeatedly (/ obvs 100)
-                                         #(rand-int obvs))) validation-indices)
+                       (set (repeatedly (/ obvs 100)
+                                        #(rand-int obvs))) validation-indices)
         train-sample (m/matrix (s/sel dataset (vec train-indices) (s/irange)))]
     {:validations validations
      :train-sample train-sample
@@ -163,13 +163,13 @@
   initial-momentum: starting momentum. Defaults to 0.5
   momentum: momentum after `momentum-delay` epochs have passed. Defaults to 0.9
   momentum-delay: epochs after which `momentum` is used instead of
-    `initial-momentum`. Defaults to 3
+  `initial-momentum`. Defaults to 3
   batch-size: size of each mini-batch. Defaults to 10
   epochs: number of times to train the model over the entire training set.
-    Defaults to 100
+  Defaults to 100
   gap-delay: number of epochs elapsed before early stopping is considered
   gap-stop-delay: number of sequential epochs where energy gap is increasing
-    before stopping"
+  before stopping"
   [rbm dataset params]
   (let [{:keys [validations train-sample dataset]}
         (select-overfitting-sets dataset)
@@ -290,9 +290,10 @@
         (map bernoulli pre-sample))))
 
 ;; This is designed for EDN printing, not actually visualizing the RBM
-;; at the REPL
-(defmethod clojure.core/print-method RBM [rbm ^Writer w]
-  (.write w (str "#deebn.rbm/RBM {"
+;; at the REPL (this is only needed because similar methods are not
+;; defined for clojure.core.matrix implementations)
+(defmethod clojure.core/print-method RBM print-RBM [rbm ^Writer w]
+  (.write w (str "#deebn.rbm.RBM {"
                  " :w " (:w rbm)
                  " :vbias " (:vbias rbm)
                  " :hbias " (:hbias rbm)
@@ -301,6 +302,19 @@
                  " :hbias-vel " (:hbias-vel rbm)
                  " :visible " (:visible rbm)
                  " :hidden " (:hidden rbm)
+                 " }")))
+
+(defmethod clojure.core/print-method CRBM print-CRBM [rbm ^Writer w]
+  (.write w (str "#deebn.rbm.CRBM {"
+                 " :w " (:w rbm)
+                 " :vbias " (:vbias rbm)
+                 " :hbias " (:hbias rbm)
+                 " :w-vel " (:w-vel rbm)
+                 " :vbias-vel " (:vbias-vel rbm)
+                 " :hbias-vel " (:hbias-vel rbm)
+                 " :visible " (:visible rbm)
+                 " :hidden " (:hidden rbm)
+                 " :classes " (:classes rbm)
                  " }")))
 
 (defn save-rbm
@@ -323,7 +337,24 @@
          (:visible data)
          (:hidden data)))
 
+(defn edn->CRBM
+  "The default map->RBM function provided by the defrecord doesn't
+  provide us with the performant implementation (i.e. matrices and
+  arrays from core.matrix), so this function adds a small step to
+  ensure that."
+  [data]
+  (->CRBM (m/matrix (:w data))
+          (m/matrix (:vbias data))
+          (m/matrix (:hbias data))
+          (m/matrix (:w-vel data))
+          (m/matrix (:vbias-vel data))
+          (m/matrix (:hbias-vel data))
+          (:visible data)
+          (:hidden data)
+          (:classes data)))
+
 (defn load-rbm
   "Load a RBM from disk."
   [filepath]
-  (edn/read-string {:readers {'deebn.rbm/RBM edn->RBM}} (slurp filepath)))
+  (edn/read-string {:readers {'deebn.rbm.RBM edn->RBM
+                              'deebn.rbm.CRBM edn->CRBM}} (slurp filepath)))

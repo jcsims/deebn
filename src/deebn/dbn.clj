@@ -1,10 +1,12 @@
 (ns deebn.dbn
   (:require [deebn.protocols :as p]
             [deebn.rbm :refer [build-rbm build-jd-rbm
-                               query-hidden sigmoid get-prediction]]
+                               query-hidden sigmoid get-prediction
+                               edn->RBM edn->CRBM]]
             [clojure.core.matrix :as m]
             [clojure.core.matrix.operators :as op]
             [clojure.core.matrix.select :as s]
+            [clojure.tools.reader.edn :as edn]
             [taoensso.timbre.profiling :as prof]))
 
 (defrecord DBN [rbms layers])
@@ -20,7 +22,6 @@
   Ex: [784 500 500 2000] -> 784-500 RBM, a 500-500 RBM, and a
   top-level 500-2000 associative memory"
   [layers]
-  {:pre [(> (count layers) 2)]}
   (let [rbms (mapv #(build-rbm %1 %2) (butlast layers) (rest layers))]
     (->DBN rbms layers)))
 
@@ -139,3 +140,20 @@
   CDBN
   (test-model [m dataset]
     (test-dbn m dataset)))
+
+;;;===========================================================================
+;;; Utility functions for a DBN
+;;;===========================================================================
+
+(defn save-dbn
+  "Save a DBN."
+  [dbn filepath]
+  (spit filepath (pr-str dbn)))
+
+(defn load-dbn
+  "Load a DBN from disk."
+  [filepath]
+  (edn/read-string {:readers {'deebn.rbm.RBM edn->RBM
+                              'deebn.rbm.CRBM edn->CRBM
+                              'deebn.dbn.DBN map->DBN
+                              'deebn.dbn.CDBN map->CDBN}} (slurp filepath)))
