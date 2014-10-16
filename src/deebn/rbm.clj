@@ -96,7 +96,8 @@
                      (* learning-rate delta-vbias))
         hbias-vel (+ (* momentum (:hbias-vel rbm))
                      (* learning-rate delta-hbias))]
-    (println " reconstruction error:" (/ squared-error batch-size))
+    (println " reconstruction error:"
+             (/ squared-error (* batch-size (:visible rbm))))
     (assoc rbm
       :w (+ (:w rbm) w-vel)
       :vbias (+ (:vbias rbm) vbias-vel)
