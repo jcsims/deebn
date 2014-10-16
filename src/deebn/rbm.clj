@@ -8,7 +8,8 @@
             [clojure.set :refer [difference]]
             [clojure.tools.reader.edn :as edn]
             [taoensso.timbre.profiling :as prof])
-  (:import java.io.Writer))
+  (:import java.io.Writer
+           mikera.vectorz.Scalar))
 
 (m/set-current-implementation :vectorz)
 
@@ -153,7 +154,7 @@
                                      (m/rows train-sample)))
         avg-validation-energy (mean (pmap #(free-energy %1 rbm)
                                           (m/rows validations)))]
-    (Math/abs (- avg-train-energy avg-validation-energy))))
+    (Math/abs ^Double (- avg-train-energy avg-validation-energy))))
 
 (defn train-rbm
   "Given a training set, train an RBM
@@ -241,21 +242,19 @@
     (vec (concat new-label obv))))
 
 (defn get-min-position
-  "Get the position of the minimum element of a collection.
-
-  TODO: This may not be the best approach."
+  "Get the position of the minimum element of a collection."
   [x]
   (if (not (empty? x))
-    (let [least (reduce min x)
-          indexed (zipmap x (range (count x)))]
+    (let [least (m/emin x)
+          indexed (zipmap (map #(.get ^Scalar %) x) (range (count x)))]
       (get indexed least))))
 
 (defn get-prediction
   "For a given observation and RBM, return the predicted class."
   [x rbm num-classes]
   (let [softmax-cases  (mapv #(gen-softmax % num-classes) (range num-classes))
-        trials  (mapv #(vec (concat % %2)) softmax-cases (repeat (butlast x)))
-        results (prof/p :results (mapv #(free-energy % rbm) trials))]
+        trials  (m/matrix (mapv #(m/join % %2) softmax-cases (repeat (butlast x))))
+        results (mapv #(free-energy % rbm) trials)]
     (get-min-position results)))
 
 (defn test-rbm
@@ -266,8 +265,8 @@
   observation."
   [rbm dataset num-classes]
   (let [num-observations (m/row-count dataset)
-        predictions (doall (pmap #(get-prediction % rbm num-classes) dataset))
-        errors (doall (map #(if (== (last %) %2) 0 1) dataset predictions))
+        predictions (pmap #(get-prediction % rbm num-classes) dataset)
+        errors (mapv #(if (== (last %) %2) 0 1) dataset predictions)
         total (reduce + errors)]
     (double (/ total num-observations))))
 
