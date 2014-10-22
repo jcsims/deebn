@@ -8,6 +8,7 @@
                  [org.clojure/data.csv "0.1.2"]
                  [net.mikera/vectorz-clj "0.26.1"]
                  [net.mikera/core.matrix "0.30.2"]
+                 [net.mikera/core.matrix.stats "0.4.1"]
                  [com.taoensso/timbre "3.3.1"]]
   :profiles {:dev {:dependencies [[org.clojure/test.check "0.5.9"]]}}
   :jvm-opts ["-Xmx4g" "-Xms3g"])

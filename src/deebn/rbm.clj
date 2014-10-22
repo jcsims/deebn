@@ -5,6 +5,7 @@
             [clojure.core.matrix :as m]
             [clojure.core.matrix.operators :refer [+ - * / ==]]
             [clojure.core.matrix.select :as s]
+            [clojure.core.matrix.random :as rand]
             [clojure.set :refer [difference]]
             [clojure.tools.reader.edn :as edn]
             [taoensso.timbre.profiling :as prof])
@@ -21,23 +22,16 @@
 (defrecord RBM [w vbias hbias w-vel vbias-vel hbias-vel visible hidden])
 (defrecord CRBM [w vbias hbias w-vel vbias-vel hbias-vel visible hidden classes])
 
-;; FIXME: This should really be Gaussian instead of uniform.
-(defn rand-vec
-  "Create a n-length vector of random real numbers in range [-range/2 range/2]"
-  [n range]
-  (repeatedly n #(- (rand range) (/ range 2))))
-
 (defn build-rbm
   "Factory function to produce an RBM record."
   [visible hidden]
-  (let [w (m/matrix (take visible
-                          (repeatedly #(rand-vec hidden 0.01))))
+  (let [w (m/matrix (repeatedly visible #(/ (rand/sample-normal hidden) 100)))
         w-vel (m/zero-matrix visible hidden)
         ;; TODO: The visual biases should really be set to
         ;; log(p_i/ (1  - p_i)), where p_i is the proportion of
         ;; training vectors in which unit i is turned on.
         vbias (m/zero-vector visible)
-        hbias (m/zero-vector hidden)
+        hbias (m/array (repeat hidden -4))
         vbias-vel (m/zero-vector visible)
         hbias-vel (m/zero-vector hidden)]
     (->RBM w vbias hbias w-vel vbias-vel hbias-vel visible hidden)))
