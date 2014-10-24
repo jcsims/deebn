@@ -90,7 +90,7 @@
                      (* learning-rate delta-vbias))
         hbias-vel (+ (* momentum (:hbias-vel rbm))
                      (* learning-rate delta-hbias))]
-    (println " reconstruction error:"
+    #_(println " reconstruction error:"
              (/ squared-error (* batch-size (:visible rbm))))
     (assoc rbm
       :w (+ (:w rbm) w-vel)
@@ -109,7 +109,8 @@
       (if (>= start (m/row-count dataset))
         rbm
         (do
-          (print "Training batch:" batch-num)
+          (print ".")
+          (flush)
           (recur (update-rbm batch rbm learning-rate momentum)
                  (m/matrix (s/sel dataset (range start end) (s/irange)))
                  (inc batch-num)))))))
@@ -187,14 +188,14 @@
            gap-inc-count 0]
       (if (> epoch epochs)
         rbm
-        (do (println "Training epoch" epoch)
+        (do (println "\nTraining epoch" epoch)
             (let [curr-momentum (if (> epoch momentum-delay)
                                   momentum initial-momentum)
                   rbm (train-epoch rbm dataset learning-rate
                                    curr-momentum batch-size)
                   gap-after-train (check-overfitting rbm train-sample
                                                      validations)
-                  _ (println "Gap pre-train:" energy-gap
+                  _ (println "\nGap pre-train:" energy-gap
                              "After train:" gap-after-train)]
               (if (and (> epoch gap-delay)
                        (neg? (- energy-gap gap-after-train))

@@ -67,7 +67,6 @@
     (loop [rbms rbms
            iter 1
            data (query-hidden (first rbms) dataset mean-field?)]
-      (println (m/shape data))
       (if (>= iter (count rbms))
         (if query-final?
           {:dbn (assoc dbn :rbms rbms) :data data}
