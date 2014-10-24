@@ -1,16 +1,17 @@
 (ns deebn.rbm
   (:refer-clojure :exclude [+ - * / ==])
   (:require [deebn.protocols :refer [Testable Trainable]]
-            [deebn.util :refer [mean bernoulli]]
+            [deebn.util :refer [bernoulli gen-softmax
+                                get-min-position sigmoid]]
             [clojure.core.matrix :as m]
             [clojure.core.matrix.operators :refer [+ - * / ==]]
             [clojure.core.matrix.select :as s]
             [clojure.core.matrix.random :as rand]
+            [clojure.core.matrix.stats :as stats]
             [clojure.set :refer [difference]]
             [clojure.tools.reader.edn :as edn]
             [taoensso.timbre.profiling :as prof])
-  (:import java.io.Writer
-           mikera.vectorz.Scalar))
+  (:import java.io.Writer))
 
 (m/set-current-implementation :vectorz)
 
@@ -51,11 +52,7 @@
 ;;;===========================================================================
 ;;; Train an RBM
 ;;; ==========================================================================
-(defn sigmoid
-  "Sigmoid function, used as an activation function for nodes in a
-  network."
-  [^double x]
-  (/ (+ 1 (Math/exp (* -1 x)))))
+
 
 (defn update-weights
   "Determine the weight gradient from this batch"
@@ -91,7 +88,7 @@
         hbias-vel (+ (* momentum (:hbias-vel rbm))
                      (* learning-rate delta-hbias))]
     #_(println " reconstruction error:"
-             (/ squared-error (* batch-size (:visible rbm))))
+               (/ squared-error (* batch-size (:visible rbm))))
     (assoc rbm
       :w (+ (:w rbm) w-vel)
       :vbias (+ (:vbias rbm) vbias-vel)
@@ -146,10 +143,10 @@
   measured by a difference in the average free energy over the
   training set sample and the validation set."
   [rbm train-sample validations]
-  (let [avg-train-energy (mean (pmap #(free-energy %1 rbm)
-                                     (m/rows train-sample)))
-        avg-validation-energy (mean (pmap #(free-energy %1 rbm)
-                                          (m/rows validations)))]
+  (let [avg-train-energy (stats/mean (pmap #(free-energy %1 rbm)
+                                           (m/rows train-sample)))
+        avg-validation-energy (stats/mean (pmap #(free-energy %1 rbm)
+                                                (m/rows validations)))]
     (Math/abs ^Double (- avg-train-energy avg-validation-energy))))
 
 (defn train-rbm
@@ -221,30 +218,6 @@
 ;;; Testing an RBM trained on a data set
 ;;;===========================================================================
 
-(defn gen-softmax
-  "Generate a softmax output. x is the class represented by the
-  output, with 0 represented by the first element in the vector."
-  [x num-classes]
-  (m/mset (m/zero-vector num-classes) x 1))
-
-(defn softmax-from-obv
-  "Given an observation with label attached, replace the label value
-  with an appropriate softmax unit. This assumes that the label is the
-  last element in an observation."
-  [x num-classes]
-  (let [label (last x)
-        obv (butlast x)
-        new-label (gen-softmax label num-classes)]
-    (vec (concat new-label obv))))
-
-(defn get-min-position
-  "Get the position of the minimum element of a collection."
-  [x]
-  (if (not (empty? x))
-    (let [least (m/emin x)
-          indexed (zipmap (map #(.get ^Scalar %) x) (range (count x)))]
-      (get indexed least))))
-
 (defn get-prediction
   "For a given observation and RBM, return the predicted class."
   [x rbm num-classes]
@@ -263,7 +236,7 @@
   (let [num-observations (m/row-count dataset)
         predictions (pmap #(get-prediction % rbm num-classes) dataset)
         errors (mapv #(if (== (last %) %2) 0 1) dataset predictions)
-        total (reduce + errors)]
+        total (m/esum errors)]
     (double (/ total num-observations))))
 
 (extend-protocol Testable
@@ -275,14 +248,6 @@
 ;;;===========================================================================
 ;;; Utility functions for an RBM
 ;;;===========================================================================
-
-(defn query-hidden
-  "Given an RBM and an input vector, query the RBM for the state of
-  the hidden nodes."
-  [rbm x mean-field?]
-  (let [pre-sample (m/emap sigmoid (+ (:hbias rbm) (m/mmul x (:w rbm))))]
-    (if mean-field? pre-sample
-        (map bernoulli pre-sample))))
 
 ;; This is designed for EDN printing, not actually visualizing the RBM
 ;; at the REPL (this is only needed because similar methods are not

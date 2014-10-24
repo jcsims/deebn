@@ -1,7 +1,7 @@
 (ns deebn.dbn
   (:require [deebn.protocols :as p]
-            [deebn.rbm :refer [build-rbm build-jd-rbm
-                               query-hidden sigmoid get-prediction
+            [deebn.util :refer [sigmoid query-hidden]]
+            [deebn.rbm :refer [build-rbm build-jd-rbm get-prediction
                                edn->RBM edn->CRBM]]
             [clojure.core.matrix :as m]
             [clojure.core.matrix.operators :as op]
