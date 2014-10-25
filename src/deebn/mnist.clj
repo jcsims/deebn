@@ -3,7 +3,7 @@
             [clojure.core.matrix.select :as select]
             [clojure.data.csv :as csv]
             [clojure.java.io :as io]
-            [deebn.rbm :refer [softmax-from-obv]]))
+            [deebn.util :refer [softmax-from-obv]]))
 
 (matrix/set-current-implementation :vectorz)
 

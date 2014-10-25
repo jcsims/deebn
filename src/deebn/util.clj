@@ -26,7 +26,7 @@
   "Generate a softmax output. x is the class represented by the
   output, with 0 represented by the first element in the vector."
   [x num-classes]
-  (m/mset (m/zero-vector num-classes) x 1))
+  (m/mset (m/array (repeat num-classes 0.1)) x 0.9))
 
 (defn softmax-from-obv
   "Given an observation with label attached, replace the label value
