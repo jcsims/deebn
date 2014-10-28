@@ -1,42 +1,25 @@
 (ns deebn.dbn
   (:require [deebn.protocols :as p]
-            [deebn.util :refer [sigmoid query-hidden]]
-            [deebn.rbm :refer [build-rbm build-jd-rbm get-prediction
-                               edn->RBM edn->CRBM]]
+            [deebn.rbm :refer [build-rbm edn->CRBM edn->RBM]]
+            [deebn.util :refer [query-hidden]]
             [clojure.core.matrix :as m]
-            [clojure.core.matrix.operators :as op]
-            [clojure.core.matrix.select :as s]
-            [clojure.tools.reader.edn :as edn]
-            [taoensso.timbre.profiling :as prof]))
+            [clojure.tools.reader.edn :as edn]))
 
 (defrecord DBN [rbms layers])
-(defrecord CDBN [rbms layers classes])
 
 (m/set-current-implementation :vectorz)
 
 (defn build-dbn
   "Build a Deep Belief Network composed of Restricted Boltzmann Machines.
 
-  layers is a vector of nodes in each layer, starting with the visible layer.
+  layers is a vector of nodes in each layer, starting with the visible
+  layer.
 
-  Ex: [784 500 500 2000] -> 784-500 RBM, a 500-500 RBM, and a
-  top-level 500-2000 associative memory"
+  Ex: [784 500 500 2000] -> 784-500 RBM, a 500-500 RBM, and a 500-2000
+  RBM"
   [layers]
   (let [rbms (mapv #(build-rbm %1 %2) (butlast layers) (rest layers))]
     (->DBN rbms layers)))
-
-(defn build-classify-dbn
-  "Build a Deep Belief Network using Restricted Boltzmann Machines
-  designed to classify an observation.
-
-  See `build-dbn` for layers usage. classes is the number of possible
-  classes the observation could be."
-  [layers classes]
-  (let [base (build-dbn (butlast layers))
-        associative (build-jd-rbm (last (butlast layers)) (last layers) classes)]
-    (map->CDBN {:rbms (conj (:rbms base) associative)
-                :layers layers
-                :classes classes})))
 
 (defn train-dbn
   "Train a generative Deep Belief Network on a dataset. This trained
@@ -77,68 +60,11 @@
                (when (or (< (inc iter) (count rbms)) query-final?)
                  (query-hidden (get rbms iter) data mean-field?)))))))
 
-(defn train-classify-dbn
-  "Train a Deep Belief Network designed to classify data vectors.
-
-  dataset is a softmax-labeled dataset, in the same format as that
-  produced by deebn.mnist/load-data-with-softmax (the softmax precedes
-  the data vector).
-
-  Check train-rbm and train-dbn for more information about
-  parameters."
-  [dbn dataset params]
-  (let [{:keys [mean-field?] :or {mean-field? true}} params
-        softmaxes (m/matrix (s/sel dataset (s/irange)
-                                   (range 0 (:classes dbn))))
-        {gen-dbn :dbn xform-data :data}
-        (train-dbn
-         (assoc dbn :rbms
-                (vec (butlast (:rbms dbn))))
-         (m/matrix (s/sel dataset (s/irange)
-                          (range (:classes dbn) (m/column-count dataset))))
-         (assoc params :query-final? true))]
-    (assoc dbn :rbms
-           (conj (:rbms gen-dbn)
-                 (p/train-model (last (:rbms dbn))
-                                (m/join-along 1 softmaxes xform-data)
-                                params)))))
-
 (extend-protocol p/Trainable
   DBN
   (train-model [m dataset params]
     (train-dbn m dataset params)))
 
-(extend-protocol p/Trainable
-  CDBN
-  (train-model [m dataset params]
-    (train-classify-dbn m dataset params)))
-
-
-;;;===========================================================================
-;;; Testing a DBN trained on a data set
-;;;===========================================================================
-
-
-(defn test-dbn
-  "Test a classification Deep Belief Network on a given dataset.
-
-  The dataset should have the label as the last entry in each
-  observation."
-  [dbn dataset]
-  (let [columns (m/column-count dataset)
-        labels (m/matrix (mapv vector (s/sel dataset (s/irange) (s/end dataset 1))))
-        ;; Propagate the dataset up through the lower layers of the DBN
-        prop-data (reduce #(query-hidden %2 %1 true)
-                          (m/matrix (s/sel dataset
-                                           (s/irange)
-                                           (range 0 (dec columns))))
-                          (butlast (:rbms dbn)))]
-    (p/test-model (last (:rbms dbn)) (m/join-along 1 prop-data labels))))
-
-(extend-protocol p/Testable
-  CDBN
-  (test-model [m dataset]
-    (test-dbn m dataset)))
 
 ;;;===========================================================================
 ;;; Utility functions for a DBN
@@ -154,5 +80,4 @@
   [filepath]
   (edn/read-string {:readers {'deebn.rbm.RBM edn->RBM
                               'deebn.rbm.CRBM edn->CRBM
-                              'deebn.dbn.DBN map->DBN
-                              'deebn.dbn.CDBN map->CDBN}} (slurp filepath)))
+                              'deebn.dbn.DBN map->DBN}} (slurp filepath)))
