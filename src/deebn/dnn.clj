@@ -5,7 +5,8 @@
             [clojure.core.matrix :as m]
             [clojure.core.matrix.operators :refer [+ * -]]
             [clojure.core.matrix.random :as rand]
-            [clojure.core.matrix.select :as s]))
+            [clojure.core.matrix.select :as s]
+            [taoensso.timbre :refer [spy debug]]))
 
 (m/set-current-implementation :vectorz)
 
@@ -65,7 +66,9 @@
   "Given a batch of training data and a DNN, update the weights and
   biases accordingly."
   [batch dnn learning-rate min-gradient]
-  (let [data (m/matrix (s/sel batch (s/irange) (range 0 (m/column-count batch))))
+  (let [data (m/matrix (s/sel batch
+                              (s/irange)
+                              (range 0 (dec (m/column-count batch)))))
         targets (mapv #(gen-softmax %1 (:classes dnn))
                       (s/sel batch (s/irange) s/end))
         data (feed-forward data dnn)
@@ -76,20 +79,20 @@
                                     (map #(vector %1 %2)
                                          (reverse (rest (:weights dnn)))
                                          (reverse (butlast (rest data))))))
-        [weights biases] (mapv #(update-layer %1 %2 %3 %4
-                                              learning-rate (m/row-count batch))
-                               (:weights dnn)
-                               (:biases dnn)
-                               (butlast data)
-                               errors)]
-    (assoc dnn :weights weights :biases biases)))
+        updated (mapv #(update-layer %1 %2 %3 %4
+                                     learning-rate (m/row-count batch))
+                      (:weights dnn)
+                      (:biases dnn)
+                      (butlast data)
+                      errors)]
+    (assoc dnn :weights (mapv first updated) :biases (mapv second updated))))
 
 (defn train-epoch
   "Given a training dataset and a net, train it for one epoch (one
   pass over the dataset)."
   [net dataset learning-rate min-gradient batch-size]
   (loop [net net
-         batch (s/sel dataset (range 0 batch-size) (s/irange))
+         batch (m/matrix (s/sel dataset (range 0 batch-size) (s/irange)))
          batch-num 0]
     (let [start (* batch-num batch-size)
           end (min (* (inc batch-num) batch-size) (m/row-count dataset))]
@@ -125,7 +128,7 @@
       (if (> epoch epochs)
         net
         (do
-          (println "Training epoch " epoch)
+          (println "\nTraining epoch " epoch)
           (recur (inc epoch)
                  (train-epoch net dataset learning-rate
                               min-gradient batch-size)))))))

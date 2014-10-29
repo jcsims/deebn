@@ -194,9 +194,9 @@
                                                      validations)
                   _ (println "\nGap pre-train:" energy-gap
                              "After train:" gap-after-train)]
-              (if (and (> epoch gap-delay)
+              (if (and (>= epoch gap-delay)
                        (neg? (- energy-gap gap-after-train))
-                       (> gap-inc-count gap-stop-delay))
+                       (>= gap-inc-count gap-stop-delay))
                 rbm
                 (recur rbm
                        (inc epoch)
