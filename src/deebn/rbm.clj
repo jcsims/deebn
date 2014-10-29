@@ -9,8 +9,7 @@
             [clojure.core.matrix.random :as rand]
             [clojure.core.matrix.stats :as stats]
             [clojure.set :refer [difference]]
-            [clojure.tools.reader.edn :as edn]
-            [taoensso.timbre.profiling :as prof])
+            [clojure.tools.reader.edn :as edn])
   (:import java.io.Writer))
 
 (m/set-current-implementation :vectorz)
@@ -81,14 +80,11 @@
                                       (m/rows h)
                                       (m/rows ph2)))
                        batch-size)
-        squared-error (m/ereduce + (m/emap #(* % %) (- batch v)))
         w-vel (+ (* momentum (:w-vel rbm)) (* learning-rate delta-w))
         vbias-vel (+ (* momentum (:vbias-vel rbm))
                      (* learning-rate delta-vbias))
         hbias-vel (+ (* momentum (:hbias-vel rbm))
                      (* learning-rate delta-hbias))]
-    #_(println " reconstruction error:"
-               (/ squared-error (* batch-size (:visible rbm))))
     (assoc rbm
       :w (+ (:w rbm) w-vel)
       :vbias (+ (:vbias rbm) vbias-vel)
