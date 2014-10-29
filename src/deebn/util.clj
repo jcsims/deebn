@@ -1,5 +1,7 @@
 (ns deebn.util
-  (:require [clojure.core.matrix :as m])
+  (:refer-clojure :exclude [+ - * /])
+  (:require [clojure.core.matrix :as m]
+            [clojure.core.matrix.operators :refer [+ - * /]])
   (:import mikera.vectorz.Scalar))
 
 (defn bernoulli
