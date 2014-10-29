@@ -54,11 +54,12 @@
         (if query-final?
           {:dbn (assoc dbn :rbms rbms) :data data}
           (assoc dbn :rbms rbms))
-        (recur (assoc rbms iter (p/train-model (get rbms iter) data params))
-               (inc iter)
-               ;; Shortcut to prevent a final, unnecessary calculation
-               (when (or (< (inc iter) (count rbms)) query-final?)
-                 (query-hidden (get rbms iter) data mean-field?)))))))
+        (let [new-rbm (p/train-model (get rbms iter) data params)]
+          (recur (assoc rbms iter new-rbm)
+                 (inc iter)
+                 ;; Shortcut to prevent a final, unnecessary calculation
+                 (when (or (< (inc iter) (count rbms)) query-final?)
+                   (query-hidden new-rbm data mean-field?))))))))
 
 (extend-protocol p/Trainable
   DBN
