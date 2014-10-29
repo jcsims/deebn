@@ -1,9 +1,10 @@
 (ns deebn.dbn
   (:require [deebn.protocols :as p]
-            [deebn.rbm :refer [build-rbm edn->CRBM edn->RBM]]
+            [deebn.rbm :refer [build-rbm build-jd-rbm edn->CRBM edn->RBM]]
             [deebn.util :refer [query-hidden]]
             [clojure.core.matrix :as m]
-            [clojure.tools.reader.edn :as edn]))
+            [clojure.tools.reader.edn :as edn]
+            [clojure.core.matrix.select :as s]))
 
 (defrecord DBN [rbms layers])
 (defrecord CDBN [rbms layers classes])
