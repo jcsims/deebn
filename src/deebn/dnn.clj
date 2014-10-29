@@ -1,6 +1,7 @@
 (ns deebn.dnn
   (:refer-clojure :exclude [+ * -])
   (:require [deebn.util :refer [sigmoid gen-softmax]]
+            [deebn.protocols :as p]
             [clojure.core.matrix :as m]
             [clojure.core.matrix.operators :refer [+ * -]]
             [clojure.core.matrix.random :as rand]
@@ -36,20 +37,6 @@
   (reductions #(prop-up %1 (get %2 0) (get %2 1))
               batch
               (map #(vector %1 %2) (:weights dnn) (:biases dnn))))
-
-(defn net-output
-  "Propagate an input matrix through the network."
-  [net input]
-  (reduce #(prop-up %1 (first %2) (second %2))
-          input
-          (mapv #(vector %1 %2) (:weights net) (:biases net))))
-
-(defn softmax->class
-  "Get the predicted class from a softmax output."
-  [x]
-  (let [largest (m/emax x)
-        indexed (zipmap x (range (m/row-count x)))]
-    (get indexed largest)))
 
 (defn layer-error
   "Calculate the error for a particular layer in a net, given the
@@ -142,3 +129,45 @@
           (recur (inc epoch)
                  (train-epoch net dataset learning-rate
                               min-gradient batch-size)))))))
+
+(extend-protocol p/Trainable
+  DNN
+  (train-model [m dataset params]
+    (train-dnn m dataset params)))
+
+
+;;;===========================================================================
+;;; Testing a DNN trained on a data set
+;;;===========================================================================
+
+(defn softmax->class
+  "Get the predicted class from a softmax output."
+  [x]
+  (let [largest (m/emax x)
+        indexed (zipmap x (range (m/row-count x)))]
+    (get indexed largest)))
+
+(defn net-output
+  "Propagate an input matrix through the network."
+  [net input]
+  (reduce #(prop-up %1 (first %2) (second %2))
+          input
+          (mapv #(vector %1 %2) (:weights net) (:biases net))))
+
+(defn test-dnn
+  "Test a Deep Neural Network on a dataset. Returns an error percentage.
+
+  dataset should have the label as the last entry in each observation."
+  [dnn dataset]
+  (let [num-observations (m/row-count dataset)
+        predictions (mapv #(softmax->class (net-output dnn %1))
+                          (m/matrix (s/sel dataset
+                                           (s/irange)
+                                           (range 0 (dec (m/column-count dataset))))))
+        errors (mapv #(if (== (last %1) %2) 0 1) dataset predictions)]
+    (double (/ (m/esum errors) num-observations))))
+
+(extend-protocol p/Testable
+  DNN
+  (test-model [m dataset]
+    (test-dnn m dataset)))
