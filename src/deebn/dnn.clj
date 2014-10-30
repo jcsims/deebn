@@ -1,12 +1,14 @@
 (ns deebn.dnn
   (:refer-clojure :exclude [+ * -])
-  (:require [deebn.util :refer [sigmoid gen-softmax]]
-            [deebn.protocols :as p]
+  (:require [deebn.protocols :as p]
+            [deebn.util :refer [sigmoid gen-softmax]]
             [clojure.core.matrix :as m]
             [clojure.core.matrix.operators :refer [+ * -]]
             [clojure.core.matrix.random :as rand]
             [clojure.core.matrix.select :as s]
-            [taoensso.timbre :refer [spy debug]]))
+            [clojure.tools.reader.edn :as edn]
+            [taoensso.timbre :refer [spy debug]])
+  (:import java.io.Writer))
 
 (m/set-current-implementation :vectorz)
 
@@ -174,3 +176,36 @@
   DNN
   (test-model [m dataset]
     (test-dnn m dataset)))
+
+;;;===========================================================================
+;;; Utility functions for a DNN
+;;;===========================================================================
+
+(defmethod clojure.core/print-method DNN print-DNN [dnn ^Writer w]
+  (.write w (str "#deebn.dnn.DNN {"
+                 " :weights " (mapv m/to-nested-vectors (:weights dnn))
+                 " :biases " (mapv m/to-nested-vectors (:biases dnn))
+                 " :layers " (:layers dnn)
+                 " :classes " (:classes dnn)
+                 " }")))
+
+(defn save-dnn
+  "Save a DNN to disk."
+  [dnn filepath]
+  (spit filepath (pr-str dnn)))
+
+(defn edn->DNN
+  "The default map->DNN function provided by the defrecord doesn't
+  provide us with the performant implementation (i.e. matrices and
+  arrays from core.matrix), so this function adds a small step to
+  ensure that."
+  [data]
+  (->DNN (mapv m/matrix (:weights data))
+         (mapv m/matrix (:biases data))
+         (:layers data)
+         (:classes data)))
+
+(defn load-dnn
+  "Load a DNN from disk."
+  [filepath]
+  (edn/read-string {:readers {'deebn.dnn.DNN edn->DNN}} (slurp filepath)))

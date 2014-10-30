@@ -24,7 +24,7 @@
   ;;; Train the model
   (def m (train-model m dataset {:batch-size 100}))
   ;; For a DNN, the DBN is converted to a DNN before fine-tuning
-  (def m (dbn->dnn d 10))
+  (def m (dbn->dnn m 10))
   (def dataset (load-data "data/mnist_train.csv"))
   (def m (train-model m dataset {:batch-size 100 :epochs 10}))
 
