@@ -37,25 +37,30 @@
   "Given an initial input batch and a DNN, feed the batch through the
   net, retaining the output of each layer."
   [batch dnn]
-  (reductions #(prop-up %1 (get %2 0) (get %2 1))
+  (reductions #(prop-up %1 (first %2) (second %2))
               batch
               (map #(vector %1 %2) (:weights dnn) (:biases dnn))))
+
+(defn net-output
+  "Propagate an input matrix through the network."
+  [net input]
+  (m/matrix (reduce #(prop-up %1 (first %2) (second %2))
+                    input
+                    (mapv #(vector %1 %2) (:weights net) (:biases net)))))
 
 (defn layer-error
   "Calculate the error for a particular layer in a net, given the
   weights for the next layer, the error for the next layer, and the
   output for the current layer."
   [weights next-error output]
-  (let [impact (m/mmul next-error (m/transpose weights))
-        sig-deriv (* output (- 1 output))]
-    (* impact sig-deriv)))
+  (* (m/mmul next-error (m/transpose weights)) (* output (- 1 output))))
 
 (defn update-layer
   "Update the weights and biases of a layer, given the previous
   weights and biases, input coming into the weights, the error for the
   layer, the learning rate, and the batch size."
-  [weights biases input error learning-rate batch-size]
-  (let [weights (- weights
+  [weights biases input error learning-rate lambda batch-size observations]
+  (let [weights (- (* weights (- (/ (* learning-rate lambda) observations)))
                    (* (/ learning-rate batch-size)
                       (reduce + (mapv m/outer-product
                                       (m/rows input)
@@ -67,22 +72,25 @@
 (defn train-batch
   "Given a batch of training data and a DNN, update the weights and
   biases accordingly."
-  [batch dnn learning-rate min-gradient]
+  [batch dnn observations learning-rate lambda]
   (let [data (m/matrix (s/sel batch
                               (s/irange)
                               (range 0 (dec (m/column-count batch)))))
         targets (mapv #(gen-softmax %1 (:classes dnn))
                       (s/sel batch (s/irange) s/end))
         data (feed-forward data dnn)
-        errors (m/emap #(* %1 (- 1 %1) (- %2 %1))
+        errors (m/emap #(- %1 %2)
                        (last data) targets)
-        errors (reverse (reductions #(layer-error (get %2 0) %1 (get %2 1))
+        errors (reverse (reductions #(layer-error (first %2) %1 (second %2))
                                     errors
                                     (map #(vector %1 %2)
                                          (reverse (rest (:weights dnn)))
                                          (reverse (butlast (rest data))))))
         updated (mapv #(update-layer %1 %2 %3 %4
-                                     learning-rate (m/row-count batch))
+                                     learning-rate
+                                     lambda
+                                     (m/row-count batch)
+                                     observations)
                       (:weights dnn)
                       (:biases dnn)
                       (butlast data)
@@ -92,7 +100,7 @@
 (defn train-epoch
   "Given a training dataset and a net, train it for one epoch (one
   pass over the dataset)."
-  [net dataset learning-rate min-gradient batch-size]
+  [net dataset observations learning-rate lambda batch-size]
   (loop [net net
          batch (m/matrix (s/sel dataset (range 0 batch-size) (s/irange)))
          batch-num 0]
@@ -101,11 +109,43 @@
       (if (>= start (m/row-count dataset))
         net
         (do
-          (print ".")
-          (flush)
-          (recur (train-batch batch net learning-rate min-gradient)
+          (recur (train-batch batch net observations learning-rate lambda)
                  (m/matrix (s/sel dataset (range start end) (s/irange)))
                  (inc batch-num)))))))
+
+(defn train-top-layer
+  "Pre-train the top logistic regression layer before moving to fine-tuning."
+  [dnn dataset observations batch-size epochs learning-rate lambda]
+  (println "Propagating dataset through DNN...")
+  (let [top-layer {:weights (vector (last (:weights dnn)))
+                   :biases (vector (last (:biases dnn)))
+                   :classes (:classes dnn)}
+        output (net-output
+                (assoc dnn
+                  :weights (butlast (:weights dnn))
+                  :biases (butlast (:biases dnn)))
+                (m/matrix
+                 (s/sel dataset
+                        (s/irange)
+                        (range 0 (dec (m/column-count dataset))))))
+        targets (m/reshape (m/matrix (s/sel dataset (s/irange) s/end))
+                           [(m/row-count dataset) 1])
+        dataset (m/join-along 1 output targets)]
+    (println "Pre-training logistic regression layer, epoch 1")
+    (loop [epoch 2
+           top-layer (train-epoch top-layer dataset observations
+                                  learning-rate lambda batch-size)]
+      (if (> epoch epochs)
+        (assoc dnn
+          :weights (assoc (:weights dnn) (dec (count (:weights dnn)))
+                          (first (:weights top-layer)))
+          :biases (assoc (:biases dnn) (dec (count (:biases dnn)))
+                         (first (:biases top-layer))))
+        (do
+          (println "Pre-training logistic regression layer, epoch" epoch)
+          (recur (inc epoch)
+                 (train-epoch top-layer dataset observations
+                              learning-rate lambda batch-size)))))))
 
 (defn train-dnn
   "Given a labeled dataset, train a DNN.
@@ -119,21 +159,25 @@
   learning-rate: default 0.01
   min-gradient: default 0.001"
   [dnn dataset params]
-  (let [{:keys [batch-size epochs learning-rate min-gradient]
+  (let [{:keys [batch-size epochs learning-rate lambda]
          :or {batch-size 100
               epochs 100
-              learning-rate 0.01
-              min-gradient 0.001}} params]
-    (println "Training epoch 1")
+              learning-rate 3.0
+              lambda 0.0}} params
+              observations (m/row-count dataset)
+              dnn (train-top-layer dnn dataset observations batch-size
+                                   epochs learning-rate lambda)]
+    (println "\nTraining epoch 1")
     (loop [epoch 2
-           net (train-epoch dnn dataset learning-rate min-gradient batch-size)]
+           net (train-epoch dnn dataset observations
+                            learning-rate lambda batch-size)]
       (if (> epoch epochs)
         net
         (do
-          (println "\nTraining epoch " epoch)
+          (println "\nTraining epoch" epoch)
           (recur (inc epoch)
-                 (train-epoch net dataset learning-rate
-                              min-gradient batch-size)))))))
+                 (train-epoch net dataset observations learning-rate
+                              lambda batch-size)))))))
 
 (extend-protocol p/Trainable
   DNN
@@ -152,13 +196,6 @@
         indexed (zipmap x (range (m/row-count x)))]
     (get indexed largest)))
 
-(defn net-output
-  "Propagate an input matrix through the network."
-  [net input]
-  (reduce #(prop-up %1 (first %2) (second %2))
-          input
-          (mapv #(vector %1 %2) (:weights net) (:biases net))))
-
 (defn test-dnn
   "Test a Deep Neural Network on a dataset. Returns an error percentage.
 
@@ -166,9 +203,10 @@
   [dnn dataset]
   (let [num-observations (m/row-count dataset)
         predictions (mapv #(softmax->class (net-output dnn %1))
-                          (m/matrix (s/sel dataset
-                                           (s/irange)
-                                           (range 0 (dec (m/column-count dataset))))))
+                          (m/matrix (s/sel
+                                     dataset
+                                     (s/irange)
+                                     (range 0 (dec (m/column-count dataset))))))
         errors (mapv #(if (== (last %1) %2) 0 1) dataset predictions)]
     (double (/ (m/esum errors) num-observations))))
 

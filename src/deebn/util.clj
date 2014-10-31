@@ -13,14 +13,13 @@
   "Sigmoid function, used as an activation function for nodes in a
   network."
   [^double x]
-  (/ (+ 1 (Math/exp (* -1 x)))))
+  (/ (inc (Math/exp (- x)))))
 
 (defn query-hidden
   "Given an RBM and an input vector, query the RBM for the state of
   the hidden nodes."
   [rbm x mean-field?]
   (let [pre-sample (m/emap sigmoid (+ (:hbias rbm) (m/mmul x (:w rbm))))]
-    (println (first pre-sample))
     (if mean-field? pre-sample
         (map bernoulli pre-sample))))
 
@@ -28,7 +27,7 @@
   "Generate a softmax output. x is the class represented by the
   output, with 0 represented by the first element in the vector."
   [x num-classes]
-  (m/mset (m/array (repeat num-classes 0.1)) x 0.9))
+  (m/mset (m/zero-vector num-classes) x 1.0))
 
 (defn softmax-from-obv
   "Given an observation with label attached, replace the label value
