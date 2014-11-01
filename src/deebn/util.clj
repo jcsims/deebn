@@ -46,3 +46,8 @@
     (let [least (m/emin x)
           indexed (zipmap (map #(.get ^Scalar %) x) (range (count x)))]
       (get indexed least))))
+
+(defn random-subset
+  "Return a matrix of a n rows randomly selected from a dataset."
+  [n dataset]
+  (matrix/matrix (take n (shuffle (matrix/rows dataset)))))
