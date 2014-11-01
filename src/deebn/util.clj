@@ -50,4 +50,4 @@
 (defn random-subset
   "Return a matrix of a n rows randomly selected from a dataset."
   [n dataset]
-  (matrix/matrix (take n (shuffle (matrix/rows dataset)))))
+  (m/matrix (take n (shuffle (m/rows dataset)))))

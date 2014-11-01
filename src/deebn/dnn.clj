@@ -60,7 +60,7 @@
   weights and biases, input coming into the weights, the error for the
   layer, the learning rate, and the batch size."
   [weights biases input error learning-rate lambda batch-size observations]
-  (let [weights (- (* weights (- (/ (* learning-rate lambda) observations)))
+  (let [weights (- (* weights (- 1 (/ (* learning-rate lambda) observations)))
                    (* (/ learning-rate batch-size)
                       (reduce + (mapv m/outer-product
                                       (m/rows input)
