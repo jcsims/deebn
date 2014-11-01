@@ -163,26 +163,22 @@
   (let [{:keys [batch-size epochs learning-rate lambda train-lower]
          :or {batch-size 100
               epochs 100
-              learning-rate 0.1
-              lambda 0.0
-              train-lower false}} params
+              learning-rate 0.5
+              lambda 0.1}} params
               observations (m/row-count dataset)
               net (train-top-layer dnn dataset observations batch-size
                                    epochs learning-rate lambda)]
-    (if-not train-lower
-      net
-      (do
-        (println "\nTraining epoch 1")
-        (loop [epoch 2
-               net (train-epoch net dataset observations
-                                learning-rate lambda batch-size)]
-          (if (> epoch epochs)
-            net
-            (do
-              (println "\nTraining epoch" epoch)
-              (recur (inc epoch)
-                     (train-epoch net dataset observations learning-rate
-                                  lambda batch-size)))))))))
+    (println "Training epoch 1")
+    (loop [epoch 2
+           net (train-epoch net dataset observations
+                            learning-rate lambda batch-size)]
+      (if (> epoch epochs)
+        net
+        (do
+          (println "\nTraining epoch" epoch)
+          (recur (inc epoch)
+                 (train-epoch net dataset observations learning-rate
+                              lambda batch-size)))))))
 
 (extend-protocol p/Trainable
   DNN
