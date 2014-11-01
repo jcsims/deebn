@@ -156,28 +156,33 @@
   params is a map that may have the following keys:
   batch-size: default 100
   epochs: default 100
-  learning-rate: default 0.01
-  min-gradient: default 0.001"
+  learning-rate: default 0.1
+  lambda: default 0.0
+  train-lower: fine-tune the lower RBMs as well. Default: false"
   [dnn dataset params]
-  (let [{:keys [batch-size epochs learning-rate lambda]
+  (let [{:keys [batch-size epochs learning-rate lambda train-lower]
          :or {batch-size 100
               epochs 100
-              learning-rate 3.0
-              lambda 0.0}} params
+              learning-rate 0.1
+              lambda 0.0
+              train-lower false}} params
               observations (m/row-count dataset)
-              dnn (train-top-layer dnn dataset observations batch-size
+              net (train-top-layer dnn dataset observations batch-size
                                    epochs learning-rate lambda)]
-    (println "\nTraining epoch 1")
-    (loop [epoch 2
-           net (train-epoch dnn dataset observations
-                            learning-rate lambda batch-size)]
-      (if (> epoch epochs)
-        net
-        (do
-          (println "\nTraining epoch" epoch)
-          (recur (inc epoch)
-                 (train-epoch net dataset observations learning-rate
-                              lambda batch-size)))))))
+    (if-not train-lower
+      net
+      (do
+        (println "\nTraining epoch 1")
+        (loop [epoch 2
+               net (train-epoch net dataset observations
+                                learning-rate lambda batch-size)]
+          (if (> epoch epochs)
+            net
+            (do
+              (println "\nTraining epoch" epoch)
+              (recur (inc epoch)
+                     (train-epoch net dataset observations learning-rate
+                                  lambda batch-size)))))))))
 
 (extend-protocol p/Trainable
   DNN
