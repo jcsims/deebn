@@ -11,4 +11,5 @@
                  [net.mikera/core.matrix.stats "0.4.1"]
                  [com.taoensso/timbre "3.3.1"]]
   :profiles {:dev {:dependencies [[org.clojure/test.check "0.5.9"]]}}
-  :jvm-opts ["-Xmx4g" "-Xms3g"])
+  :jvm-opts ["-Xmx4g" "-Xms3g"]
+  :deploy-repositories [["releases" :clojars]])
