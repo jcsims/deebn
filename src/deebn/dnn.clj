@@ -156,9 +156,8 @@
   params is a map that may have the following keys:
   batch-size: default 100
   epochs: default 100
-  learning-rate: default 0.1
-  lambda: default 0.0
-  train-lower: fine-tune the lower RBMs as well. Default: false"
+  learning-rate: default 0.5
+  lambda: default 0.1 "
   [dnn dataset params]
   (let [{:keys [batch-size epochs learning-rate lambda train-lower]
          :or {batch-size 100
@@ -196,6 +195,16 @@
   (let [largest (m/emax x)
         indexed (zipmap x (range (m/row-count x)))]
     (get indexed largest)))
+
+(defn classify-obv
+  "Given a DNN and a single observation, return the model's prediction."
+  [dnn obv]
+  (softmax->class (net-output dnn obv)))
+
+(extend-protocol p/Classify
+  DNN
+  (classify [m obv]
+    (classify-obv m obv)))
 
 (defn test-dnn
   "Test a Deep Neural Network on a dataset. Returns an error percentage.

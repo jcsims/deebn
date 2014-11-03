@@ -117,6 +117,19 @@
 ;;; Testing a DBN trained on a data set
 ;;;===========================================================================
 
+(defn classify-obv
+  "Given a DBN and a single observation, return the model's prediction."
+  [dbn obv]
+  (let [prop-data (reduce #(query-hidden %2 %1 true)
+                          obv
+                          (butlast (:rbms dbn)))]
+    (p/classify (last (:rbms dbn)) prop-data)))
+
+(extend-protocol p/Classify
+  CDBN
+  (classify [m obv]
+    (classify-obv m obv)))
+
 
 (defn test-dbn
   "Test a classification Deep Belief Network on a given dataset.

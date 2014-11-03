@@ -1,6 +1,6 @@
 (ns deebn.rbm
   (:refer-clojure :exclude [+ - * / ==])
-  (:require [deebn.protocols :refer [Testable Trainable]]
+  (:require [deebn.protocols :refer [Testable Trainable Classify]]
             [deebn.util :refer [bernoulli gen-softmax
                                 get-min-position sigmoid]]
             [clojure.core.matrix :as m]
@@ -216,11 +216,19 @@
 
 (defn get-prediction
   "For a given observation and RBM, return the predicted class."
-  [x rbm num-classes]
+  [x rbm num-classes labeled?]
   (let [softmax-cases  (mapv #(gen-softmax % num-classes) (range num-classes))
-        trials  (m/matrix (mapv #(m/join % %2) softmax-cases (repeat (butlast x))))
+        trials  (m/matrix (mapv #(m/join % %2) softmax-cases
+                                (if labeled?
+                                  (repeat (butlast x))
+                                  (repeat x))))
         results (mapv #(free-energy % rbm) trials)]
     (get-min-position results)))
+
+(extend-protocol Classify
+  CRBM
+  (classify [m obv]
+    (get-prediction obv m (:classes m) false)))
 
 (defn test-rbm
   "Test a joint density RBM trained on a data set. Returns an error
@@ -230,7 +238,7 @@
   observation."
   [rbm dataset num-classes]
   (let [num-observations (m/row-count dataset)
-        predictions (pmap #(get-prediction % rbm num-classes) dataset)
+        predictions (pmap #(get-prediction % rbm num-classes true) dataset)
         errors (mapv #(if (== (last %) %2) 0 1) dataset predictions)
         total (m/esum errors)]
     (double (/ total num-observations))))

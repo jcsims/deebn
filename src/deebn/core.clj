@@ -3,7 +3,7 @@
             [deebn.dnn :refer [dbn->dnn]]
             [deebn.mnist :refer [load-data-sans-label
                                  load-data-with-softmax load-data]]
-            [deebn.protocols :refer [train-model test-model]]
+            [deebn.protocols :refer [train-model test-model classify]]
             [deebn.rbm :refer [build-rbm build-jd-rbm]]
             [clojure.core.matrix :refer [set-current-implementation]]))
 
@@ -31,4 +31,8 @@
   ;;; Test the model
   (def test-dataset (load-data "data/mnist_test.csv"))
   (test-model m test-dataset)
+
+  ;;; Classify a single observation
+  (def dv (first (load-data-sans-label "data/mnist_test.csv")))
+  (classify m dv)
   )
