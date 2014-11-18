@@ -4,6 +4,12 @@ A Clojure library implementing a Deep Belief Network using Restricted
 Boltzmann Machines, based on [Geoffery Hinton's work][work]. This
 library is the result of my thesis research into deep learning methods.
 
+## "Installation"
+`deebn` is available for download or usage through your favorite dependency management tool from
+Clojars: 
+
+[![Clojars Project](http://clojars.org/deebn/latest-version.svg)](http://clojars.org/deebn)
+
 ## Capabilities
 
 There are a few types of model that you can build and train, either
