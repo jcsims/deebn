@@ -76,8 +76,8 @@
   (let [data (m/matrix (s/sel batch
                               (s/irange)
                               (range 0 (dec (m/column-count batch)))))
-        targets (mapv #(gen-softmax %1 (:classes dnn))
-                      (s/sel batch (s/irange) s/end))
+        targets (m/matrix (mapv #(gen-softmax %1 (:classes dnn))
+                                (s/sel batch (s/irange) s/end)))
         data (feed-forward data dnn)
         errors (m/emap #(- %1 %2)
                        (last data) targets)
@@ -130,7 +130,7 @@
                         (range 0 (dec (m/column-count dataset))))))
         targets (m/reshape (m/matrix (s/sel dataset (s/irange) s/end))
                            [(m/row-count dataset) 1])
-        dataset (m/join-along 1 output targets)]
+        dataset (m/matrix (m/join-along 1 output targets))]
     (println "Pre-training logistic regression layer, epoch 1")
     (loop [epoch 2
            top-layer (train-epoch top-layer dataset observations
