@@ -1,4 +1,4 @@
-(defproject deebn "1.0.0-SNAPSHOT"
+(defproject deebn "0.1.1-SNAPSHOT"
   :description "Deep Belief Network using Restricted Boltzmann Machines"
   :url "https://jcsi.ms"
   :license {:name "Eclipse Public License"
