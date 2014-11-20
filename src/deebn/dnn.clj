@@ -159,7 +159,7 @@
   learning-rate: default 0.5
   lambda: default 0.1 "
   [dnn dataset params]
-  (let [{:keys [batch-size epochs learning-rate lambda train-lower]
+  (let [{:keys [batch-size epochs learning-rate lambda]
          :or {batch-size 100
               epochs 100
               learning-rate 0.5
