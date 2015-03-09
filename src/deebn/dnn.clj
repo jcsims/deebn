@@ -6,8 +6,7 @@
             [clojure.core.matrix.operators :refer [+ * -]]
             [clojure.core.matrix.random :as rand]
             [clojure.core.matrix.select :as s]
-            [clojure.tools.reader.edn :as edn]
-            [taoensso.timbre :refer [spy debug]])
+            [clojure.tools.reader.edn :as edn])
   (:import java.io.Writer))
 
 (m/set-current-implementation :vectorz)
@@ -122,8 +121,8 @@
                    :classes (:classes dnn)}
         output (net-output
                 (assoc dnn
-                  :weights (butlast (:weights dnn))
-                  :biases (butlast (:biases dnn)))
+                       :weights (butlast (:weights dnn))
+                       :biases (butlast (:biases dnn)))
                 (m/matrix
                  (s/sel dataset
                         (s/irange)
@@ -137,10 +136,10 @@
                                   learning-rate lambda batch-size)]
       (if (> epoch epochs)
         (assoc dnn
-          :weights (assoc (:weights dnn) (dec (count (:weights dnn)))
-                          (first (:weights top-layer)))
-          :biases (assoc (:biases dnn) (dec (count (:biases dnn)))
-                         (first (:biases top-layer))))
+               :weights (assoc (:weights dnn) (dec (count (:weights dnn)))
+                               (first (:weights top-layer)))
+               :biases (assoc (:biases dnn) (dec (count (:biases dnn)))
+                              (first (:biases top-layer))))
         (do
           (println "Pre-training logistic regression layer, epoch" epoch)
           (recur (inc epoch)
